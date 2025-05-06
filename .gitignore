@@ -1,0 +1,23 @@
+.DS_Store
+*.sw[po]
+*.*~
+*.orig
+Include/
+Lib/
+share/
+Scripts/
+pip-selfcheck.json
+bin/
+local/
+include/
+tcl/
+
+# Byte-compiled / optimized / DLL files
+.DS_Store
+__pycache__/
+*.py[cod]
+.env
+*.tvpp
+
+
+
