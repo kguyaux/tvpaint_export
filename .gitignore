@@ -18,6 +18,10 @@ __pycache__/
 *.py[cod]
 .env
 *.tvpp
+out/
+trash/
+_bytes_dump_/
+
 
 
 
