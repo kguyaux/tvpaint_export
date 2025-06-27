@@ -1,19 +1,17 @@
 # TVPAINT-EXPORT
 # ==============
 
-I wanted to be able to extract the image-data from a tvpaint-file (*.tvpp), for a more efficient
-VFX-pipeline. To be able to automatically export the imagedata, without needing to run the tvpaint-application itself.
-So I did a little digging with python and was able to extract the imagedata.
+Export images from a tvpaint-project(*.tvpp). Supported tvpaint-versions are 9,10, & 11. (12+ is untested)
 
-Update 24 june 2025.
-First verson was just a proof of concept and not very usable.
-I revised the code to make it more usable. It still needs some refactoring and documentation. I will do that when I have time.
+### Changelog:
+- version 1.0.0  (27 june 2025)
+First version was just a proof of concept and not very usable.
+I revised the code to make it more usable. It still needs some refactoring and documentation. I will do that when I have time.  
+I tested the code with some tvpaint-files, from tvpaint-versions 9, 10 & 11. There might be some specific cases of datastorage that need to be resolved.
+If you encounter errors, then let me know or file an issue.
 
-I tested the code with some tvpaint-files, from tvpaint-versions 9, 10 & 11. There might be some cases of data storage that need to be resolved.
-If you encounter, then let me know or file an issue.
-
-
-
+### TODO:
+- handle multiple clips and scenes. I don't have example-tvp-projects that contain multiple scenes/clips. Expect errors when your project has those. I need an example to fix the code for this, so If someone has an example-tvpp with multiple clips/scenes and can send it to me then that would be nice :-)
 
 ### Usage:
 ```sh
