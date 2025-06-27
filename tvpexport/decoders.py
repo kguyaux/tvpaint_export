@@ -8,7 +8,6 @@ import struct
 import sys
 import uuid
 import zlib
-
 import numpy as np
 
 # setup logger
@@ -40,6 +39,7 @@ def bypass(func):
         logger.debug(f"Function '{func.__name__}' was bypassed..")
     return wrapper
 
+
 def print_bytes(func):
     """ A helper-decorator to print the bytes in hex.
     """
@@ -47,6 +47,7 @@ def print_bytes(func):
         data = args[1]
         logger.debug(f"{data}")
     return wrapper
+
 
 def dump_bytes(with_uid=False):
     """
@@ -164,11 +165,13 @@ def unpack_RLE(data):
         unpacked.extend(result)
     return unpacked
 
+
 ################################################################
 ##                                                            ##
 ##                   LAYER DECODERS                           ##
 ##                                                            ##
 ################################################################
+
 def decode_LNAM(data: bytes):
 
     """ LNAM contains the layername (utf8) """
@@ -262,66 +265,8 @@ def decode_DBOD(data: bytes, image_width: int, image_height: int):
 
 @bypass
 def decode_UDAT(contents: bytes):
-    """Process UDAT
-
-    Is this Scribbledata?
-    """
-
-    udat_size = len(contents)
-    offset = 16
-    a = struct.unpack_from(">I", contents, offset=offset)[0]
-    print("udat_a:", a)
-    offset += 4
-    b = struct.unpack_from(">I", contents, offset=offset)[0]
-    print("udat_b:", b)
-    offset += 4
-    while offset < udat_size:
-        # skip B2 etc
-        offset += 16
-        # 2 int's
-        c = struct.unpack_from(">I", contents, offset=offset)[0]
-        print("b2_01:", c)
-        offset += 4
-        sub_size = struct.unpack_from(">I", contents, offset=offset)[0]
-        print("sub_size:", sub_size)
-        offset += 4
-        sub_data = contents[offset : offset + sub_size]
-        offset += sub_size
-        sub_offset = 0
-        first = struct.unpack_from(">I", sub_data, offset=sub_offset)[0]
-        print("sub_first:", first)
-        sub_offset += 4
-        if first > 0:
-            while sub_offset < sub_size:
-                sub_a = struct.unpack_from(">I", sub_data, offset=sub_offset)[0]
-                print("sub_a", sub_a)
-                sub_offset += 4
-                sub_wordlength = (
-                    struct.unpack_from(">H", sub_data, offset=sub_offset)[0]
-                ) * 2
-                print("wordlength:", sub_wordlength)
-                sub_offset += 2
-                stuff = sub_data[sub_offset : sub_offset + sub_wordlength]
-                print(bytearray(stuff).decode("utf-16be"))
-                sub_offset += sub_wordlength
-                sub_offset += 16  # ???
-                sub_offset += 52  # ????
-                sub_offset += 4  # 0 ?
-                sub_seclength = struct.unpack_from(
-                    ">I", sub_data, offset=sub_offset
-                )[0]
-                sub_offset += 4
-
-                stuff = sub_data[sub_offset : sub_offset + sub_seclength]
-                print(bytearray(stuff).decode("utf-16be"))
-                sub_offset += sub_seclength
-                sub_offset += 20
-                sub_seclength = struct.unpack_from(
-                    ">I", sub_data, offset=sub_offset
-                )[0]
-                sub_offset += 4
-                stuff = sub_data[sub_offset : sub_offset + sub_seclength]
-                print(bytearray(stuff).decode("utf-16be"))
+    """Process UDAT """
+    pass
 
 ################################################################
 ##                                                            ##
@@ -331,26 +276,8 @@ def decode_UDAT(contents: bytes):
 
 @bypass
 def decode_XS24(contents):
-    """ Unknown
-
-    Thumbnaildata?
-
-    """
-    a = struct.unpack_from(">H", contents, offset=0)[0]
-    b = struct.unpack_from(">H", contents, offset=2)[0]
-    length = struct.unpack_from(">I", contents, offset=4)[0]
-
-    print(a, b, length)
-    for i in range(0, a * b):
-        if i % a == 0:
-            print("====================")
-        hx = ":".join(
-            ["{:02x}".format(x) for x in contents[i * 3 + 8 : i * 3 + 11]]
-        )
-        dc = ":".join(
-            ["{:03d}".format(x) for x in contents[i * 3 + 8 : i * 3 + 11]]
-        )
-        print("{}\t{}".format(hx, dc))
+    """ Unknown """
+    pass
 
 def decode_DGBL(contents):
     """Unknown"""

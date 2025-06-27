@@ -16,16 +16,11 @@ formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 
-def show_window(tvpp, bg_color, img, timeout=0):
 
-    """
-    args:
-        image_data(numpy-array)
-    """
+def show_window(tvpp, bg_color, img, timeout=0):
 
     # TVPaint 9 stores pixeldata as ABGR
     if tvpp.tvpaint_version[0] == 9:
@@ -69,44 +64,44 @@ def save_img(tvpp, layer, img, index, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Demo for exporting and inspecting TVPaint project files. Only first clip is supported(yet)"
+        description="Export images from a tvpaint-project."
     )
     parser.add_argument(
         "tvpp",
         type=str,
-        help="Path to the TVPaint project file (.tvpp)"
+        help="Path of TVPaint project file (.tvpp)"
     )
     parser.add_argument('-d',
         "--debug",
         action="store_true",
-        help="Show debug info"
+        help="Show debug info."
     )
     parser.add_argument('-l',
         "--layer",
         type=int,
-        help="index of the layer to inscpect (from top to bottom = [0:])"
+        help="index of the layer to inspect (from top to bottom = [0:])"
     )
 
     parser.add_argument('-f',
         "--frame",
         type=int,
-        help="Which frame to choose, omitting this will process all"
+        help="Which frame to choose, omitting this will process all frames of the layer."
     )
     parser.add_argument('-s',
         "--show",
         action="store_true",
-        help="Show image"
+        help="Display image."
     )
 
     parser.add_argument('-i',
         "--interactive",
         action="store_true",
-        help="Slideshow-mode: press key for next frame"
+        help="Slideshow-mode: press key for next frame(ESC to quit)"
     )
     parser.add_argument('-o',
         "--output_dir",
         type=str,
-        help="Output-dir of where to save images(overwrites)"
+        help="Output-dir of where to save images(overwrites!)."
     )
 
     args = parser.parse_args()
@@ -126,7 +121,9 @@ def main():
         if args.frame is not None:
             start_time = time.time()
             image = layer.frame(args.frame)
-            logger.debug(f"Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds")
+            logger.info(
+                f"Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds"
+            )
 
             if args.show:
                 show_window(tvptree, clip.bgp1, image)
@@ -137,7 +134,9 @@ def main():
             for i in range(end_frame + 1):
                 start_time = time.time()
                 img = layer.frame(i)
-                logger.debug(f"Frame {i}, processing took: {time.time() - start_time:.6f} seconds")
+                logger.info(
+                    f"Frame {i}, processing took: {time.time() - start_time:.6f} seconds"
+                )
                 if args.show:
                     if args.interactive:
                         show_window(tvptree, clip.bgp1, img)

@@ -6,7 +6,6 @@ Issued under the "do what you like with it - I take no responsibility" licence
 import sys
 import struct
 import numpy as np
-import cv2
 from . import decoders
 import logging
 
@@ -72,7 +71,6 @@ class Clip(object):
             clip_index=clip_index
         )
         self.metadata = self._read_clip_metadata(tvptree.file_path, clip_tree)
-        # self.clip_index_data = self.build_clip_data_index(tvptree.file_path, clip_tree)
         with open(self.tvptree.file_path, 'rb') as file_obj:
             self.read_clip_data(file_obj, clip_tree)
 
@@ -261,13 +259,13 @@ class Layer(object):
             else:
                 raise RuntimeError(f"No tile of type: '{tile.type}'")
 
-
-            if False:
-                tile_data[5:25, 1:50, :3] = (0,0,255)
-                tile_data[5:25, 1:50, 3] = 150
-                cv2.putText(
-                    tile_data, str(tile_index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
-                )
+            # # Debugging:
+            # if True:
+            #     tile_data[5:25, 1:50, :3] = (0,0,255)
+            #     tile_data[5:25, 1:50, 3] = 150
+            #     cv2.putText(
+            #         tile_data, str(tile_index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
+            #     )
 
             result_img[y: y + tile_data.shape[0], x:x + tile_data.shape[1]] = tile_data
 
@@ -339,7 +337,7 @@ class Image(object):
             data_offset = 0
             total_length = len(self.raw_data)
 
-            tile_size = struct.unpack_from(">I", self.raw_data, data_offset)[0]
+            _tile_size = struct.unpack_from(">I", self.raw_data, data_offset)[0]
             data_offset += 4
             # print("TS", tile_size)
 
@@ -350,7 +348,7 @@ class Image(object):
             data_offset += thumb_size
             # print(data_offset)
             tile_index = 0
-            tile_amount = struct.unpack_from(">I", self._raw_data, data_offset)[0]
+            _tile_amount = struct.unpack_from(">I", self._raw_data, data_offset)[0]
             # print("tile_amount", tile_amount)
             data_offset += 4
             while data_offset < total_length - 4:
@@ -372,90 +370,22 @@ class Image(object):
                     data_offset += size
 
                 self._tiles.append(tile)
-                # print("tile", tile_index, tile.type, data_offset, total_length)
                 tile_index += 1
-
-
-    # def create_tiles(self, image_data, w, h, tile_size = 64):
-    #     """ Generate tiles of the image_data.
-
-    #     Args:
-
-    #     Returns:
-
-    #     """
-    #     self.tiles = []
-    #     self.set_canvas_size(64, w, h)
-    #     num_tiles_y = (h // tile_size + int(h % tile_size > 1))
-    #     num_tiles_x = (w // tile_size + int(w % tile_size > 1))
-    #     ww = num_tiles_x * tile_size
-    #     hh = num_tiles_y * tile_size
-    #     self.size = (ww, hh)
-    #     num_tiles = num_tiles_y * num_tiles_x
-    #     for tile_index in range(0, num_tiles):
-    #         tile = ImageTile("RAW")
-    #         xpos = ((tile_index * tile_size) % ww)
-    #         ypos = tile_index * tile_size // ww * tile_size
-    #         tile.data = image_data[ypos:ypos + tile_size, xpos:xpos + tile_size]
-    #         tile.width = image_data.shape[1]
-    #         tile.height = image_data.shape[0]
-    #         self.tiles.append(tile)
-
-    # def from_tiles(self, w, h, tile_size=64):
-    #     height = (h // tile_size + int(h % tile_size > 1)) * tile_size
-    #     width = (w // tile_size + int(w % tile_size > 1)) * tile_size
-    #     self.size = (width, height)
-
-    #     result_img = np.zeros(shape=(height, width, 4), dtype=np.uint8)
-    #     # num_tiles = height * width
-    #     for tile_index in range(0, len(self.tiles)):
-    #         tile = self.tiles[tile_index]
-    #         x = (tile_index * tile_size ) % width
-    #         # print(x)
-    #         y = ((tile_index * tile_size) // width) * tile_size
-
-    #         if tile.type == "RAW":
-    #             image_data = tile.data
-    #         elif tile.type == "RLE":
-    #             decoded = unpack_RLE(tile.rle_data)
-    #             image_data = np.ndarray(
-    #                 shape=(tile.height, tile.width, 4),
-    #                 dtype=np.uint8,
-    #                 buffer=decoded
-    #             )
-    #         else:
-    #             raise RuntimeError(f"Unknown tile-type: '{tile.type}'")
-
-    #         if image_data.shape != (tile_size, tile_size):
-    #             square = np.zeros(shape=(tile_size, tile_size, 4), dtype=np.uint8)
-    #             square[:image_data.shape[0], :image_data.shape[1]] = image_data
-    #             result_img[y: y + tile_size, x:x + tile_size] = square
-    #         else:
-    #             result_img[y: y + tile_size, x:x + tile_size] = image_data
-
-    #     return result_img
-
-
-
 
 
 class ImageTile(object):
     """ An imagetile is a piece of an image.
 
-    Tvpaint stores imagedata as tiles (mostly 64x64 pixels). I think for memory-efficient
-    storage..
+    Tvpaint stores imagedata(SRAW) as tiles (mostly 64x64 pixels).
     """
-    def __init__(self, type_name, initial_data=None):
+    def __init__(self, type_name):
         self.type = type_name
-
         self.ref_local_tile = False
         self.lookup_tile_index = 0
         self.width = 0
         self.height = 0
         self.rle_data = bytearray()
         self._data = None
-        if initial_data is not None:
-            self.data = initial_data # Use the setter for initial assignment
 
     @property
     def data(self):
@@ -469,18 +399,4 @@ class ImageTile(object):
     @data.setter
     def data(self, data):
         self._data = data
-
-    @data.setter
-    def data(self, new_data):
-        """
-        Setter for the image_data attribute.
-        Raises an error if the new_data is not a np.ndarray.
-        """
-        if not isinstance(new_data, np.ndarray):
-            raise TypeError(
-                f"Image data must be a numpy.ndarray, but got {type(new_data)} instead."
-            )
-        self._data = new_data
-
-
 
