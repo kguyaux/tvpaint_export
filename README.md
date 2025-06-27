@@ -4,8 +4,8 @@
 Export images from a tvpaint-project(*.tvpp). Supported tvpaint-versions are 9,10, & 11. (12+ is untested)
 
 ### Changelog:
-- version 1.0.0  (27 june 2025)
-First version was just a proof of concept and not very usable.
+- version 1.0.0  (27 june 2025)  
+The previous version was just a proof of concept and not very usable.
 I revised the code to make it more usable. It still needs some refactoring and documentation. I will do that when I have time.  
 I tested the code with some tvpaint-files, from tvpaint-versions 9, 10 & 11. There might be some specific cases of datastorage that need to be resolved.
 If you encounter errors, then let me know or file an issue.
