@@ -138,7 +138,7 @@ def parse_utf16_dictdata(data: bytes):
 ################################################################
 
 def unpack_RLE(data):
-    """Return imagedata from RLE-compressed data.
+    """Return uncompressed data from RLE-compressed data.
 
     Args:
         data: (bytes) a datablock
@@ -146,23 +146,34 @@ def unpack_RLE(data):
         bytearray(): RGBA data (8bit)
     """
     pixel_bytes = 4
+    data_mv = memoryview(data)
+    data_length = len(data_mv)
+
     unpacked = bytearray()
     offset = 0
-    while offset < len(data):
-        _byte = struct.unpack_from("B", data, offset=offset)[0]
-        if _byte <= 0x7B:  # <=123
-            size = _byte + 1
+
+    while offset < data_length:
+        # _byte = struct.unpack_from("B", data, offset=offset)[0]
+        magicnumber = data_mv[offset]
+        start = offset + 1
+        if magicnumber <= 0x7B:  # <=123
+            size = magicnumber + 1
             length = size * pixel_bytes
-            result = data[offset + 1 : offset + length + 1]
-            offset += length + 1
-        elif _byte >= 0x85:  # >=133
-            multiplier = 255 - _byte + 2
-            result = data[offset + 1 : offset + pixel_bytes + 1] * multiplier
-            offset += pixel_bytes + 1
+            end = start + length
+            unpacked.extend(data_mv[start:end])
+            offset = end
+
+        elif magicnumber >= 0x85:  # >=133
+            multiplier = 255 - magicnumber + 2
+            end = start + pixel_bytes
+            chunk = bytearray(data_mv[start: end])
+            unpacked.extend(chunk * multiplier)
         else:
             if offset == len(data) - 1:
                 break
-        unpacked.extend(result)
+            end = offset + 1
+
+        offset = end
     return unpacked
 
 

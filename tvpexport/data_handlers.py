@@ -206,7 +206,10 @@ class Layer(object):
 
 
         for tile in image.tiles:
-            tile_data = self._get_tile_data(image, tile)
+            if image.type == "DBOD":
+                tile_data = tile.data
+            else:  # SRAW
+                tile_data = self._get_tile_data(image, tile)
             # # Debugging:
             # if True:
             #     tile_data[5:25, 1:50, :3] = (0,0,255)
@@ -221,12 +224,10 @@ class Layer(object):
 
         return image.result
 
+    def ______get_tile_data(self, image, tile):
 
-    def _get_tile_data(self, image, tile):
-
-        if image.type != "DBOD":
-            tile.width = self.images[0].tiles[tile.index].width
-            tile.height = self.images[0].tiles[tile.index].height
+        tile.width = self.images[0].tiles[tile.index].width
+        tile.height = self.images[0].tiles[tile.index].height
 
         if tile.type == "RAW":
             tile_data = tile.data
@@ -244,6 +245,8 @@ class Layer(object):
                 ypos = (local_tile_index * image.tile_size // image.max_tilewidth ) * image.tile_size
                 tile_data = image.result[ypos: ypos + image.tile_size, xpos:xpos + image.tile_size].copy()
             else:
+
+                
                 while i > 0:
                     i -= 1  # previous image
                     if self.images[i].first_info == 6:
@@ -275,6 +278,37 @@ class Layer(object):
 
         return tile_data
 
+    def _get_tile_data(self, image, tile):
+
+        tile.width = self.images[0].tiles[tile.index].width
+        tile.height = self.images[0].tiles[tile.index].height
+
+        if tile.type == "RAW":
+            tile_data = tile.data
+
+        elif tile.type == "RLE":
+            tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
+
+        elif tile.type == "CPY":
+            # traverse back to previous imagetiles
+            if tile.ref_local_tile == True:
+                local_tile_index = tile.lookup_tile_index
+                xpos = ((local_tile_index * image.tile_size) % image.max_tilewidth)
+                ypos = (local_tile_index * image.tile_size // image.max_tilewidth ) * image.tile_size
+                tile_data = image.result[ypos: ypos + image.tile_size, xpos:xpos + image.tile_size].copy()
+            else:
+                if image.first_info == 6 or image.first_info == image.tile_size:
+                    prev_image = self.images[image.index -1]
+                elif image.first_info == 2:
+                    prev_image = self.images[image.second_info]
+                else:
+                    raise RuntimeError(f"First info {image.first_info}")
+
+                prev_tile = prev_image.tiles[tile.index]
+                tile_data = self._get_tile_data(prev_image, prev_tile)
+
+
+        return tile_data
 
 
 class Image(object):
