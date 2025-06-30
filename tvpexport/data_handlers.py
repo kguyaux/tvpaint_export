@@ -1,4 +1,4 @@
-""" The LayerData-class provides functions to process tvpaint-data
+""" Provides handlers for various data-stuff like Clip, Layer, Image, etc.
 
 Issued under the "do what you like with it - I take no responsibility" licence
 """
@@ -181,6 +181,7 @@ class Layer(object):
         self.images = []
         self.width = width
         self.height = height
+        
 
     def frame(self, index):
         start_frame = self.settings['start_frame']
@@ -192,96 +193,103 @@ class Layer(object):
 
 
     def construct_image(self, img_index):
-        result_img = np.zeros(shape=(self.height, self.width, 4), dtype=np.uint8)
         image = self.images[img_index]
+        image.result = np.zeros(shape=(self.height, self.width, 4), dtype=np.uint8)
 
         while image.type != "DBOD" and image.first_info in (2,6):
             if image.first_info == 2:
                 image = self.images[image.second_info]
             elif image.first_info == 6:
-                image = self.images[image.image_index - 1]
+                image = self.images[image.index - 1]
             else:
                 pass
 
-        num_tiles_x = (self.width // image.tile_size + int(image.width % image.tile_size > 0))
-        xwidth = num_tiles_x * image.tile_size
+        
+        for tile in image.tiles:
+            tile_data = self._get_tile_data(image, tile)
 
-        for tile_index, tile in enumerate(image.tiles):
+            x = (tile.index * image.tile_size ) % image.max_tilewidth
+            y = ((tile.index * image.tile_size) // image.max_tilewidth) * image.tile_size
+            image.result[y: y + tile_data.shape[0], x:x + tile_data.shape[1]] = tile_data
 
-            if image.type != "DBOD":
-                tile.width = self.images[0].tiles[tile_index].width
-                tile.height = self.images[0].tiles[tile_index].height
+        return image.result
 
-            x = (tile_index * image.tile_size ) % xwidth
-            y = ((tile_index * 64) // xwidth) * image.tile_size
-            if tile.type == "RAW":
-                tile_data = tile.data
 
-            elif tile.type == "RLE":
-                tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
+    def _get_tile_data(self, image, tile):
+        if image.type != "DBOD":
+            tile.width = self.images[0].tiles[tile.index].width
+            tile.height = self.images[0].tiles[tile.index].height
 
-            elif tile.type == "CPY":
-                # traverse back to previous imagetiles
-                i = img_index
-                if tile.ref_local_tile == False:
-                    while i > 0:
-                        i -= 1  # previous image
-                        if self.images[i].first_info == 6:
-                            continue
-                        if self.images[i].first_info == 2:
-                            i = self.images[i].second_info
-                            continue
+        if tile.type == "RAW":
+            tile_data = tile.data
 
-                        prev_tile = self.images[i].tiles[tile_index]
-                        if prev_tile.type == "CPY":
-                            if prev_tile.ref_local_tile:
-                                diverted_tile = self.images[i].tiles[prev_tile.lookup_tile_index]
-                                if diverted_tile.type == "CPY":
-                                    tile_index = prev_tile.lookup_tile_index
-                                    continue
-                                else:
-                                    tile_data = diverted_tile.data
-                            else:
+        elif tile.type == "RLE":
+            tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
+
+        elif tile.type == "CPY":
+            # traverse back to previous imagetiles
+            i = image.index
+            if tile.ref_local_tile == False:
+                while i > 0:
+                    i -= 1  # previous image
+                    if self.images[i].first_info == 6:
+                        continue
+                    if self.images[i].first_info == 2:
+                        i = self.images[i].second_info
+                        continue
+
+                    prev_tile = self.images[i].tiles[tile.index]
+                    if prev_tile.type == "CPY":
+                        if prev_tile.ref_local_tile:
+                            diverted_tile = self.images[i].tiles[prev_tile.lookup_tile_index]
+                            if diverted_tile.type == "CPY":
+                                tile_index = prev_tile.lookup_tile_index
                                 continue
-                        if prev_tile.type == "RAW":
-                            tile_data = prev_tile.data
-                            break
-                        if prev_tile.type == "RLE":
-                            tile_data = decoders.decode_DBOD(prev_tile.rle_data, tile.width, tile.height)
-                            break
+                            else:
+                                tile_data = diverted_tile.data
+                        else:
+                            continue
+                    if prev_tile.type == "RAW":
+                        tile_data = prev_tile.data
+                        break
+                    if prev_tile.type == "RLE":
+                        tile_data = decoders.decode_DBOD(prev_tile.rle_data, tile.width, tile.height)
+                        break
 
-                if tile.ref_local_tile == True:
-                    local_tile_index = tile.lookup_tile_index
-                    xpos = ((local_tile_index * image.tile_size) % xwidth)
-                    ypos = (local_tile_index * image.tile_size // xwidth ) * image.tile_size
-                    tile_data = result_img[ypos: ypos + image.tile_size, xpos:xpos + image.tile_size].copy()
+            if tile.ref_local_tile == True:
+                local_tile_index = tile.lookup_tile_index
+                xpos = ((local_tile_index * image.tile_size) % image.max_tilewidth)
+                ypos = (local_tile_index * image.tile_size // image.max_tilewidth ) * image.tile_size
+                tile_data = image.result[ypos: ypos + image.tile_size, xpos:xpos + image.tile_size].copy()
 
-            else:
-                raise RuntimeError(f"No tile of type: '{tile.type}'")
 
-            # # Debugging:
-            # if True:
-            #     tile_data[5:25, 1:50, :3] = (0,0,255)
-            #     tile_data[5:25, 1:50, 3] = 150
-            #     cv2.putText(
-            #         tile_data, str(tile_index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
-            #     )
+        # # Debugging:
+        # if True:
+        #     tile_data[5:25, 1:50, :3] = (0,0,255)
+        #     tile_data[5:25, 1:50, 3] = 150
+        #     cv2.putText(
+        #         tile_data, str(tile_index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
+        #     )
+        return tile_data
 
-            result_img[y: y + tile_data.shape[0], x:x + tile_data.shape[1]] = tile_data
-
-        return result_img
 
 
 class Image(object):
-    def __init__(self, image_type, image_index, width, height, tile_size=64):
+    def __init__(self, image_type, index, width, height, tile_size=64):
         self.type = image_type
-        self.image_index = image_index
+        self.index = index
         self._raw_data = bytes()
         self.width = width
         self.height = height
-        self.sraw_repeat = False
+        # self.sraw_repeat = False
         self._tiles = []
         self.tile_size = tile_size
+
+        self.num_tiles_x = self.width // self.tile_size + int(self.width % self.tile_size > 0)
+        self.num_tiles_y = (self.height // self.tile_size + int(self.height % self.tile_size > 0))
+        self.num_tiles = self.num_tiles_x * self.tile_size
+        self.max_tilewidth = self.num_tiles_x * self.tile_size
+
 
     @property
     def raw_data(self):
@@ -315,17 +323,12 @@ class Image(object):
 
     def create_tiles(self):
         trigger_unzip = self.first_info  # TODO: improve this
-        num_tiles_x = (self.width // self.tile_size + int(self.width % self.tile_size > 0))
-        num_tiles_y = (self.height // self.tile_size + int(self.height % self.tile_size > 0))
-        num_tiles = num_tiles_x * num_tiles_y
-        xwidth = num_tiles_x * self.tile_size
-
         if self.type == "DBOD":
             image_data = decoders.decode_DBOD(self.raw_data, self.width, self.height)
-            for tile_index in range(0, num_tiles):
-                tile = ImageTile("RAW")
-                xpos = ((tile_index * self.tile_size) % xwidth)
-                ypos = tile_index * self.tile_size // xwidth * self.tile_size
+            for tile_index in range(0, self.num_tiles):
+                tile = ImageTile("RAW", tile_index)
+                xpos = ((tile_index * self.tile_size) % self.max_tilewidth)
+                ypos = tile_index * self.tile_size // self.max_tilewidth * self.tile_size
                 tile.data = image_data[ypos:ypos + self.tile_size, xpos:xpos + self.tile_size]
                 tile.width = tile.data.shape[1]
                 tile.height = tile.data.shape[0]
@@ -339,20 +342,17 @@ class Image(object):
 
             _tile_size = struct.unpack_from(">I", self.raw_data, data_offset)[0]
             data_offset += 4
-            # print("TS", tile_size)
 
             thumb_size = struct.unpack_from(">I", self._raw_data, data_offset)[0]
             data_offset += 4
-            # print("THUMBSize", thumb_size)
             _thumbdata = self._raw_data[data_offset : data_offset + thumb_size]
             data_offset += thumb_size
-            # print(data_offset)
-            tile_index = 0
-            _tile_amount = struct.unpack_from(">I", self._raw_data, data_offset)[0]
-            # print("tile_amount", tile_amount)
+            
+            tile_amount = struct.unpack_from(">I", self._raw_data, data_offset)[0]
             data_offset += 4
-            while data_offset < total_length - 4:
-                tile = ImageTile("")
+            # while data_offset < total_length - 4:
+            for tile_index in range(tile_amount):
+                tile = ImageTile("", tile_index)
                 magicnumber = struct.unpack_from(">I", self.raw_data, data_offset)[0]
                 data_offset += 4
                 if magicnumber == 0:
@@ -370,7 +370,6 @@ class Image(object):
                     data_offset += size
 
                 self._tiles.append(tile)
-                tile_index += 1
 
 
 class ImageTile(object):
@@ -378,7 +377,8 @@ class ImageTile(object):
 
     Tvpaint stores imagedata(SRAW) as tiles (mostly 64x64 pixels).
     """
-    def __init__(self, type_name):
+    def __init__(self, type_name, index):
+        self.index = index
         self.type = type_name
         self.ref_local_tile = False
         self.lookup_tile_index = 0
@@ -392,7 +392,7 @@ class ImageTile(object):
         """
         Getter for the image_data attribute.
         """
-        if self.rle_data:
+        if self.rle_data and self._data is None:
             self._data = decoders.decode_DBOD(self.rle_data, self.width, self.height)
         return self._data
 

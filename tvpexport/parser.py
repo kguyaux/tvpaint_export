@@ -21,6 +21,8 @@ logger.addHandler(handler)
 
 class Node(object):
     """ A tree-item for the tvpaint-project-tree-structure.
+
+    It provides the 'children'(list)-attr from which you can acces its sub-items.
     """
 
     def __init__(self):
@@ -170,7 +172,7 @@ class TvpProject(object):
         TODO: scenes might need their own class
 
         TODO: I don't have an example with multiple scenes, so the setup of the
-        scenes-list is uncliear to me. For now I assume that scene_index=0 returns
+        scenes-list is unclear to me. For now I assume that scene_index=0 returns
         the first scene-item.
 
         """
@@ -205,7 +207,7 @@ class TvpProject(object):
 
 
     def read_scene_metadata(self, scene_data):
-        """Get scene info.
+        """Get scene metadats that tvpaint stores.
 
         Read it from disk, parse the data into a dict.
 
