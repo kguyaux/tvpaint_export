@@ -224,62 +224,8 @@ class Layer(object):
 
         return image.result
 
-    def ______get_tile_data(self, image, tile):
-
-        tile.width = self.images[0].tiles[tile.index].width
-        tile.height = self.images[0].tiles[tile.index].height
-
-        if tile.type == "RAW":
-            tile_data = tile.data
-
-        elif tile.type == "RLE":
-            tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
-
-        elif tile.type == "CPY":
-            # traverse back to previous imagetiles
-            i = image.index
-            prev_tile_index = -1
-            if tile.ref_local_tile == True:
-                local_tile_index = tile.lookup_tile_index
-                xpos = ((local_tile_index * image.tile_size) % image.max_tilewidth)
-                ypos = (local_tile_index * image.tile_size // image.max_tilewidth ) * image.tile_size
-                tile_data = image.result[ypos: ypos + image.tile_size, xpos:xpos + image.tile_size].copy()
-            else:
-
-                
-                while i > 0:
-                    i -= 1  # previous image
-                    if self.images[i].first_info == 6:
-                        continue
-                    if self.images[i].first_info == 2:
-                        i = self.images[i].second_info
-                        continue
-                    if prev_tile_index >= 0:
-                        prev_tile = self.images[i].tiles[prev_tile_index]
-                    else:
-                        prev_tile = self.images[i].tiles[tile.index]
-
-                    if prev_tile.type == "CPY":
-                        if prev_tile.ref_local_tile:
-                            diverted_tile = self.images[i].tiles[prev_tile.lookup_tile_index]
-                            if diverted_tile.type == "CPY":
-                                prev_tile_index = prev_tile.lookup_tile_index
-                                continue
-                            else:
-                                tile_data = diverted_tile.data
-                        else:
-                            continue
-                    if prev_tile.type == "RAW":
-                        tile_data = prev_tile.data
-                        break
-                    if prev_tile.type == "RLE":
-                        tile_data = decoders.decode_DBOD(prev_tile.rle_data, tile.width, tile.height)
-                        break
-
-        return tile_data
-
+  
     def _get_tile_data(self, image, tile):
-
         tile.width = self.images[0].tiles[tile.index].width
         tile.height = self.images[0].tiles[tile.index].height
 
@@ -307,7 +253,6 @@ class Layer(object):
                 prev_tile = prev_image.tiles[tile.index]
                 tile_data = self._get_tile_data(prev_image, prev_tile)
 
-
         return tile_data
 
 
@@ -327,7 +272,6 @@ class Image(object):
         self.num_tiles_y = (self.height // self.tile_size + int(self.height % self.tile_size > 0))
         self.num_tiles = self.num_tiles_x * self.tile_size
         self.max_tilewidth = self.num_tiles_x * self.tile_size
-
 
     @property
     def raw_data(self):
