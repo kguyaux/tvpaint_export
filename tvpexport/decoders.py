@@ -44,8 +44,8 @@ def print_bytes(func):
     """ A helper-decorator to print the bytes in hex.
     """
     def wrapper(*args, **kwargs):
-        data = args[1]
-        logger.debug(f"{data}")
+        data = args[0]
+        logger.debug(f"{func.__name__}: {data}")
     return wrapper
 
 
@@ -62,6 +62,8 @@ def dump_bytes(with_uid=False):
                 uniq = "_" + uuid.uuid4().hex[:8]
             else:
                 uniq = ""
+            if not os.path.exists(BYTEDUMP_DIR):
+                os.makedirs(BYTEDUMP_DIR)
             with open(
                 os.path.join(
                     BYTEDUMP_DIR,
@@ -290,61 +292,64 @@ def decode_XS24(contents):
     """ Unknown """
     pass
 
-def decode_DGBL(contents):
+def decode_DGBL(data):
     """Unknown"""
-    pass
+    return data
 
-def decode_DPEL(contents):
+def decode_DPEL(data):
     """Unknown"""
-    pass
+    return struct.unpack('>10H', data)
 
 def decode_DLOC(data):
     return struct.unpack_from(">HHHH", data)
 
-def decode_BGMD(contents):
+def decode_BGMD(data):
     """Unknown"""
-    pass
+    return data
 
-def decode_ARAT(contents):
-    """Unknown"""
-    pass
+def decode_ARAT(data):
+    """ 2 values of 1000000"""
+    return struct.unpack('>II', data)
 
-def decode_CRLR(contents):
+def decode_CRLR(data):
     """Unknown"""
-    pass
+    return struct.unpack('>I', data)
 
 def decode_BGP1(data):
+    """ Background colorpattern1"""
     return struct.unpack_from("BBBB", data)
 
 
 def decode_BGP2(data):
-    """ Backgroundcolorpattern 2"""
+    """ Background colorpattern2"""
     return struct.unpack_from("BBBB", data)
 
+def decode_ANNO(data):
+    """ Annotation """
+    return [t.decode("utf8") for t in data.partition(b'\x00') if t and t != b'\x00']
 
-def decode_ANNO(contents):
+def decode_FRAT(data):
     """Unknown"""
-    pass
+    return data
 
-def decode_FRAT(contents):
-    """Unknown"""
-    pass
 
-def decode_FILD(contents):
+def decode_FILD(data):
     """Unknown"""
-    pass
+    return struct.unpack('>II', data)
 
-def decode_MARK(contents):
-    """Unknown"""
-    pass
+def decode_MARK(data):
+    """mark in/out data?"""
+    if len(data) == 16:
+        return struct.unpack('>IIII', data)
 
-def decode_XSHT(contents):
+def decode_XSHT(data):
     """Unknown"""
-    pass
+    return data
 
-def decode_TLNT(contents):
+def decode_TLNT(data):
     """Unknown"""
-    pass
+    # return struct.unpack('>I', data)
+    return data
 
 def decode_SPAR(contents):
     """Unknown"""
