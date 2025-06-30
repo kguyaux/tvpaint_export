@@ -387,12 +387,13 @@ class ImageTile(object):
         self.rle_data = bytearray()
         self._data = None
 
+
     @property
     def data(self):
         """
         Getter for the image_data attribute.
         """
-        if self.rle_data:
+        if self.rle_data and self._data is None:
             self._data = decoders.decode_DBOD(self.rle_data, self.width, self.height)
         return self._data
 
