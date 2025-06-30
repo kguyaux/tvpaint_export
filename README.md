@@ -17,28 +17,29 @@ If you encounter errors, then let me know or file an issue.
 ```sh
 $ pip install opencv-python numpy
 $ python -m tvpexport -h
+
 usage: __main__.py [-h] [-d] [-l LAYER] [-f FRAME] [-s] [-i] [-o OUTPUT_DIR] tvpp
 
-Demo for exporting and inspecting TVPaint project files. Only first clip is supported(yet)
+Export images from a tvpaint-project.
 
 positional arguments:
-  tvpp                  Path to the TVPaint project file (.tvpp)
+  tvpp                  Path of TVPaint project file (.tvpp)
 
 options:
   -h, --help            show this help message and exit
-  -d, --debug           Show debug info
+  -d, --debug           Show debug info.
   -l LAYER, --layer LAYER
-                        index of the layer to inscpect (from top to bottom = [0:])
+                        index of the layer to inspect (from top to bottom = [0:])
   -f FRAME, --frame FRAME
-                        Which frame to choose, omitting this will process all
-  -s, --show            Show image
-  -i, --interactive     Slideshow-mode: press key for next frame
+                        Which frame to choose, omitting this will process all frames of the layer.
+  -s, --show            Display image.
+  -i, --interactive     Slideshow-mode: press key for next frame(ESC to quit)
   -o OUTPUT_DIR, --output_dir OUTPUT_DIR
-                        Output-dir of where to save images(overwrites)
+                        Output-dir of where to save images(overwrites!).
 
 #example:
 python -m my_tvpaint-project_v004.tvpp -d -l 0 -s -o output_dir
-# will show debugmessages while auto-showing all images of layer 0 (index = top to bottom), and save the images as png tp directory 'output_dir'
+# will show debugmessages while auto-showing all images of layer 0 (index = top to bottom), and save the images as png to directory 'output_dir'
 ```
 
 ### Disclaimer
