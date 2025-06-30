@@ -1,5 +1,5 @@
-# TVPAINT-EXPORT
-# ==============
+TVPAINT-EXPORT
+==============
 
 Export images from a tvpaint-project(*.tvpp). Supported tvpaint-versions are 9,10, & 11. (12+ is untested)
 
