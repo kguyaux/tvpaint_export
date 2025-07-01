@@ -6,6 +6,7 @@ Issued under the "do what you like with it - I take no responsibility" licence
 import sys
 import struct
 import numpy as np
+import cv2
 from . import decoders
 import logging
 
@@ -25,6 +26,31 @@ class Clip(object):
     In the tvpaint-format the data is stored by ID's, in this order:
 
     clip-intro:
+        XS24  Thumbnail
+        DGBL
+        DPEL
+        DLOC
+        BGMD
+        ARAT
+        CRLR
+        BGP1
+        BGP2
+        ANNO
+        FRAT
+        FILD
+        MARK
+        XSHT  Xsheet(?)
+        TLNT  80 bytes of ?
+        SPAR  ?
+
+    layer ( * n):
+        LNAM  layername
+        LNAW  layername
+        LRHD
+        ZCHK  zipped imagedata (DBOD or SRAW)
+        DBOD  First imagedata, full image RLE-encoded
+        SRAW  imagedata related to DBOD, pieces of RLE-encoded ata
+:
         XS24  Thumbnail
         DGBL
         DPEL
@@ -261,30 +287,23 @@ class Layer(object):
                 tile_data = tile.data
             else:  # SRAW
                 tile_data = self._resolve_tile_data(image, tile)
-            # # Debugging:
+
+            # Debugging:
             # if True:
             #     tile_data[5:25, 1:50, :3] = (0,0,255)
             #     tile_data[5:25, 1:50, 3] = 150
             #     cv2.putText(
-            #         tile_data, str(tile_index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
+            #         tile_data, str(tile.index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
             #     )
 
             x = (tile.index * image.tile_size) % image.max_tilewidth
-            y = (
-                (tile.index * image.tile_size) // image.max_tilewidth
-            ) * image.tile_size
-            try:
-                image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
-            except:
-                print(image.result.shape)
-                print(image.width)
-                print(image.height)
-                raise
+            y = (tile.index * image.tile_size) // image.max_tilewidth * image.tile_size
+            image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
 
         return image.result
 
     def _resolve_tile_data(self, image, tile):
-        """_summary_
+        """Resolve tile-data
 
         Args:
             image (_type_): _description_
@@ -308,14 +327,39 @@ class Layer(object):
         elif tile.type == "CPY":
             # traverse back to previous imagetiles
             if tile.ref_local_tile == True:
-                local_tile_index = tile.lookup_tile_index
-                xpos = (local_tile_index * image.tile_size) % image.max_tilewidth
-                ypos = (
-                    local_tile_index * image.tile_size // image.max_tilewidth
-                ) * image.tile_size
-                tile_data = image.result[
-                    ypos : ypos + image.tile_size, xpos : xpos + image.tile_size
-                ].copy()
+                ref_local_tile_index = tile.lookup_tile_index
+                ref_tile = image.tiles[ref_local_tile_index]
+                # print(f">>>: Tile {tile.index} refers to local: {ref_tile.index} ({ref_tile.type} to local: {ref_tile.ref_local_tile})")
+
+                if ref_tile.type == "CPY":
+                    # If the locally referred tile is of type 'CPY', then Resolve
+                    # further
+
+                    if image.first_info == 6 or image.first_info == image.tile_size:
+                        prev_image = self.images[image.index - 1]
+                    elif image.first_info == 2:
+                        prev_image = self.images[image.second_info]
+                    else:
+                        raise RuntimeError(f"Unknown 'First info': {image.first_info}")
+
+                    prev_tile = prev_image.tiles[ref_local_tile_index]
+                    tile_data = self._resolve_tile_data(prev_image, prev_tile)
+                else:
+                    # copy the image-data from local image
+                    xpos = (ref_local_tile_index * image.tile_size) % image.max_tilewidth
+                    ypos = (
+                        ref_local_tile_index * image.tile_size // image.max_tilewidth
+                    ) * image.tile_size
+                    tile_data = image.result[
+                        ypos : ypos + image.tile_size, xpos : xpos + image.tile_size
+                    ].copy()
+
+                # # Print local_tile_index
+                # tile_data[20:50, 1:50, :3] = (0, 255, 0)
+                # tile_data[20:50, 1:50, 3] = 200
+                # cv2.putText(
+                #     tile_data, str(local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
+                # )
             else:
 
                 if image.first_info == 6 or image.first_info == image.tile_size:
@@ -326,7 +370,6 @@ class Layer(object):
                     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
 
                 prev_tile = prev_image.tiles[tile.index]
-
                 tile_data = self._resolve_tile_data(prev_image, prev_tile)
 
         return tile_data
@@ -339,7 +382,6 @@ class Image(object):
         self._raw_data = bytes()
         self.width = width
         self.height = height
-        # self.sraw_repeat = False
         self._tiles = []
         self.tile_size = tile_size
         self._result = np.ndarray([])
@@ -356,6 +398,10 @@ class Image(object):
 
     @property
     def result(self):
+        """ This will store the final image-data(np.ndarray).
+        It is empty when the class is initialized. Gets filled when accessed.
+
+        """
         if not self._result.shape:
             self._result = np.zeros(shape=(self.height, self.width, 4), dtype=np.uint8)
         return self._result
@@ -416,34 +462,33 @@ class Image(object):
                 self._tiles.append(tile)
 
         if self.type == "SRAW":
-
+            unpack_uint = struct.Struct('>I').unpack_from
             data_offset = 0
             total_length = len(self.raw_data)
 
-            _tile_size = struct.unpack_from(">I", self.raw_data, data_offset)[0]
+            # We already assume tile_size is 64
+            _tile_size = unpack_uint(self.raw_data, data_offset)[0]
             data_offset += 4
 
-            thumb_size = struct.unpack_from(">I", self._raw_data, data_offset)[0]
+            thumb_size = unpack_uint(self._raw_data, data_offset)[0]
             data_offset += 4
             _thumbdata = self._raw_data[data_offset : data_offset + thumb_size]
             data_offset += thumb_size
 
-            tile_amount = struct.unpack_from(">I", self._raw_data, data_offset)[0]
+            tile_amount = unpack_uint(self._raw_data, data_offset)[0]
             data_offset += 4
             for tile_index in range(tile_amount):
                 tile = ImageTile("", tile_index)
-                magicnumber = struct.unpack_from(">I", self.raw_data, data_offset)[0]
+                magicnumber = unpack_uint(self.raw_data, data_offset)[0]
                 data_offset += 4
                 if magicnumber == 0:
                     tile.type = "CPY"
                     tile.ref_local_tile = not bool(
-                        struct.unpack_from(">I", self.raw_data, data_offset)[0]
+                        unpack_uint(self.raw_data, data_offset)[0]
                     )
 
                     data_offset += 4
-                    tile.lookup_tile_index = struct.unpack_from(
-                        ">I", self.raw_data, data_offset
-                    )[0]
+                    tile.lookup_tile_index = unpack_uint(self.raw_data, data_offset)[0]
                     data_offset += 4
 
                 else:

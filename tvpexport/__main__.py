@@ -9,6 +9,9 @@ from pprint import pprint
 from .parser import TvpProject
 from .data_handlers import Clip
 
+import cProfile
+import pstats
+
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
@@ -116,7 +119,6 @@ def main():
 
     if args.layer is not None:
         layer = clip.layers[args.layer]
-        print("numlayers:", len(clip.layers))
         pprint(layer.settings)
         if args.frame is not None:
             start_time = time.time()
@@ -147,4 +149,18 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    profile_output_file = "my_profile_data.prof"
+    cProfile.run('main()', profile_output_file)
+
+    # 2. Load the stats from the file
+    stats = pstats.Stats(profile_output_file)
+
+    # 3. Sort by 'ncalls'
+    stats.sort_stats('ncalls') # Or 'ncalls' as a string
+
+    # 4. Reverse the order (lowest ncalls first)
+    # Note: pstats.Stats.reverse_stats() reverses the *current* sort order.
+    stats.reverse_order()
+
+    # 5. Print the stats
+    stats.print_stats()
