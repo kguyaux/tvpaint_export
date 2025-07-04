@@ -9,9 +9,6 @@ from pprint import pprint
 from .parser import TvpProject
 from .data_handlers import Clip
 
-import cProfile
-import pstats
-
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
@@ -107,23 +104,40 @@ def main():
         help="Output-dir of where to save images(overwrites!)."
     )
 
+    parser.add_argument('-p',
+        "--print_info",
+        action="store_true",
+        help="Print info of everything (project, clip, scene, layer)"
+    )
+
     args = parser.parse_args()
     if args.debug:
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.DEBUG)
 
-
     tvptree = TvpProject(args.tvpp)
-    clip = Clip(tvptree)
-    pprint(clip.metadata)
+    scene = tvptree.get_scene_tree(scene_index=0)
+    clip = Clip(tvptree, scene_index=0, clip_index=0)
+
+    if args.print_info:
+        pprint(tvptree.metadata)
+        pprint(tvptree.read_scene_metadata(scene))
+        pprint(clip.metadata)
 
     if args.layer is not None:
         layer = clip.layers[args.layer]
-        pprint(layer.settings)
+
+        if args.print_info:
+            pprint(layer.settings)
+
+        # for faster testing the imageprocessing, you can comment this out.
+        if not args.output_dir and not args.show:
+            sys.exit(0)
+
         if args.frame is not None:
             start_time = time.time()
             image = layer.frame(args.frame)
-            logger.info(
+            logger.debug(
                 f"Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds"
             )
 
@@ -149,18 +163,4 @@ def main():
 
 
 if __name__ == "__main__":
-    profile_output_file = "my_profile_data.prof"
-    cProfile.run('main()', profile_output_file)
-
-    # 2. Load the stats from the file
-    stats = pstats.Stats(profile_output_file)
-
-    # 3. Sort by 'ncalls'
-    stats.sort_stats('ncalls') # Or 'ncalls' as a string
-
-    # 4. Reverse the order (lowest ncalls first)
-    # Note: pstats.Stats.reverse_stats() reverses the *current* sort order.
-    stats.reverse_order()
-
-    # 5. Print the stats
-    stats.print_stats()
+    main()
