@@ -8,7 +8,9 @@ import struct
 import numpy as np
 import cv2
 from . import decoders
+from circular_dict import CircularDict
 import logging
+from collections import deque
 
 # setup logger
 logger = logging.getLogger(__name__)
@@ -152,6 +154,7 @@ class Clip(object):
         form_size = struct.unpack_from(">I", header_bytes, 4)[0]
         tvpp_name = bytes(struct.unpack_from("BBBB", header_bytes, 8)).decode("ascii")
         logger.debug(f"{form_name}, {form_size} {tvpp_name}")
+
 
         layer_index = -1
         while offset < form_size:
@@ -298,7 +301,12 @@ class Layer(object):
 
             x = (tile.index * image.tile_size) % image.max_tilewidth
             y = (tile.index * image.tile_size) // image.max_tilewidth * image.tile_size
-            image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
+            try:
+                image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
+            except:
+                print(tile.data)
+                print(tile.data.shape)
+                raise
 
         return image.result
 
@@ -322,7 +330,8 @@ class Layer(object):
             tile_data = tile.data
 
         elif tile.type == "RLE":
-            tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
+            tile_data = tile.data
+            # tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
 
         elif tile.type == "CPY":
             # traverse back to previous imagetiles
@@ -375,8 +384,10 @@ class Layer(object):
         return tile_data
 
 
+
 class Image(object):
-    def __init__(self, image_type, index, width, height, tile_size=64):
+    def __init__(self, image_type, index, width, height, tile_size=64, cache=None):
+        self.cache = None
         self.type = image_type
         self.index = index
         self._raw_data = bytes()
@@ -385,6 +396,8 @@ class Image(object):
         self._tiles = []
         self.tile_size = tile_size
         self._result = np.ndarray([])
+        self._first_info = None
+        self._second_info = None
 
         # set dimensions for calculating tile-positions, and data-slices.
         self.num_tiles_x = self.width // self.tile_size + int(
@@ -426,11 +439,15 @@ class Image(object):
 
     @property
     def first_info(self):
-        return struct.unpack_from(">I", self.raw_data, 0)[0]
+        if not self._first_info:
+            self._first_info = struct.unpack_from(">I", self.raw_data, 0)[0]
+        return self._first_info
 
     @property
     def second_info(self):
-        return struct.unpack_from(">I", self.raw_data, 4)[0]
+        if not self._second_info:
+            self._second_info = struct.unpack_from(">I", self.raw_data, 4)[0]
+        return self._second_info
 
     @property
     def third_info(self):
@@ -446,10 +463,13 @@ class Image(object):
         """_summary_
         """
         _trigger_unzip = self.first_info  # TODO: improve this
+
+        tile_cache = TileCache()
+
         if self.type == "DBOD":
             image_data = decoders.decode_DBOD(self.raw_data, self.width, self.height)
             for tile_index in range(0, self.num_tiles):
-                tile = ImageTile("RAW", tile_index)
+                tile = ImageTile("RAW", self.index, tile_index, tile_cache=tile_cache)
                 xpos = (tile_index * self.tile_size) % self.max_tilewidth
                 ypos = (
                     tile_index * self.tile_size // self.max_tilewidth * self.tile_size
@@ -462,7 +482,9 @@ class Image(object):
                 self._tiles.append(tile)
 
         if self.type == "SRAW":
+            # precompile unpack_from to improve speed
             unpack_uint = struct.Struct('>I').unpack_from
+
             data_offset = 0
             total_length = len(self.raw_data)
 
@@ -478,7 +500,7 @@ class Image(object):
             tile_amount = unpack_uint(self._raw_data, data_offset)[0]
             data_offset += 4
             for tile_index in range(tile_amount):
-                tile = ImageTile("", tile_index)
+                tile = ImageTile("", self.index, tile_index, tile_cache=tile_cache)
                 magicnumber = unpack_uint(self.raw_data, data_offset)[0]
                 data_offset += 4
                 if magicnumber == 0:
@@ -506,22 +528,57 @@ class ImageTile(object):
     Tvpaint stores imagedata(SRAW) as tiles (mostly 64x64 pixels).
     """
 
-    def __init__(self, type_name, index):
+    def __init__(self, type_name, image_index, index, tile_cache=None):
         self.index = index
+        self.image_index = image_index
         self.type = type_name
         self.ref_local_tile = False
         self.lookup_tile_index = 0
         self.width = 0
         self.height = 0
+        self.cache = tile_cache
         self.rle_data = bytes()
         self._data = np.ndarray([])
 
     @property
     def data(self):
+        cached_tile_data = self.cache.get_from_cache(self.image_index, self.index)
+        if cached_tile_data is not None:
+            return cached_tile_data
+
         if self.rle_data and self._data.size == 0:
             self._data = decoders.decode_DBOD(self.rle_data, self.width, self.height)
+
+        self.cache.append((self.image_index, self.index, self._data))
         return self._data
 
     @data.setter
     def data(self, data):
         self._data = data
+
+
+
+class TileCache(object):
+
+    def __init__(self):
+        self.cache = CircularDict(maxlen=10)
+
+    def append(self, dd):
+        image_index, tile_index, img_data = dd
+        key = f"{image_index:04d}_{tile_index:05d}"
+        if key in self.cache:
+            return
+        self.cache[key] = img_data
+        print("hahahaha", len(self.cache.keys()))
+
+    def get_from_cache(self, image_index, tile_index):
+        key = f"{image_index:04d}_{tile_index:05d}"
+        if key in self.cache:
+            print(f"fetched {image_index} {tile_index}: {key}")
+            ret = self.cache[key]
+            print(type(ret))
+            return ret
+        else:
+            return None
+
+
