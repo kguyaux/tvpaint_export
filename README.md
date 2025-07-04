@@ -24,9 +24,7 @@ If you encounter errors, then let me know or file an issue.
 $ pip install opencv-python numpy
 $ python -m tvpexport -h
 
-usage: __main__.py [-h] [-d] [-l LAYER] [-f FRAME] [-s] [-i] [-o OUTPUT_DIR] tvpp
-
-usage: __main__.py [-h] [-d] [-l LAYER] [-f FRAME] [-s] [-i] [-o OUTPUT_DIR] [-p] tvpp
+usage: __main__.py [-h] [-d] [-a] [-l LAYER] [-f FRAME] [-s] [-i] [-o OUTPUT_DIR] [-p] tvpaint-file(*.tvpp)
 
 Export images from a tvpaint-project.
 
