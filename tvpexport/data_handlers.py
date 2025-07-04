@@ -6,7 +6,7 @@ Issued under the "do what you like with it - I take no responsibility" licence
 import sys
 import struct
 import numpy as np
-import cv2
+# import cv2
 from . import decoders
 import logging
 
@@ -201,7 +201,7 @@ class Clip(object):
             if ident == "LNAM":
                 layer_index += 1  # LNAM is the first item of a layer, so up the index
                 layer_name = decoders.decode_LNAM(data)
-                new_layer = Layer(layer_name, self.width, self.height)
+                new_layer = Layer(layer_index, layer_name, self.width, self.height)
                 self.layers.append(new_layer)
 
             if ident == "LRHD":
@@ -213,7 +213,7 @@ class Clip(object):
             if ident == "LRSR":  # it's a ctg-layer for layer above
                 layer_index += 1
                 new_layer = Layer(
-                    self.layers[layer_index - 1].name, self.width, self.height
+                    layer_index, self.layers[layer_index - 1].name, self.width, self.height
                 )
                 new_layer.settings = self.layers[layer_index - 1].settings
                 new_layer.is_ctg = True
@@ -241,7 +241,8 @@ class Layer(object):
     UDAT  scribbledata(?)
     """
 
-    def __init__(self, name, width, height):
+    def __init__(self, index, name, width, height):
+        self.index = index
         self.name = name
         self.is_ctg = False
         self.images = []
@@ -284,7 +285,6 @@ class Layer(object):
                 image = self.images[image.index - 1]
 
         for tile in image.tiles:
-            print(f"TILE: {tile.index} =========================================== ")
             if image.type == "DBOD":
                 tile_data = tile.data
             else:  # SRAW
@@ -301,32 +301,6 @@ class Layer(object):
             x = (tile.index * image.tile_size) % image.max_tilewidth
             y = (tile.index * image.tile_size) // image.max_tilewidth * image.tile_size
             image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
-
-            # # TVPaint 9 stores pixeldata as ABGR
-            # img = image.result
-            # try:
-            #     alpha = img[:, :, 3].astype(float) / 255
-            #     fg = alpha[:, :, np.newaxis] * img[:, :, :3].astype(float) / 255
-
-            #     background = (
-            #         np.zeros(shape=(img.shape[0], img.shape[1], 3), dtype=float) + 0.5
-            #     )
-            #     bg = (1 - alpha[:, :, np.newaxis]) * background
-            #     res = cv2.add(fg, bg)
-            #     res = (res * 255).astype(np.uint8)
-
-            #     window_name = "Image Fit to Display"
-            #     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-            #     target_width = 1024
-            #     target_height = 1024
-            #     cv2.resizeWindow(window_name, target_width, target_height)
-            #     cv2.imshow(window_name, res)
-            #     x = cv2.waitKey(0)
-            #     if x==27:    # Esc key to stop
-            #         cv2.destroyAllWindows()
-            #         sys.exit(0)
-            # except:
-            #     raise
 
 
         return image.result
@@ -350,7 +324,6 @@ class Layer(object):
         tile.width = self.images[0].tiles[tile.index].width
         tile.height = self.images[0].tiles[tile.index].height
 
-        print(f"{pfx} at image: {image.index}, current tile({tile.type}): {tile.index}, ref-local={tile.ref_local_tile} ref to tile -> {tile.ref_local_tile_index}")
         if tile.type == "RAW":
             tile_data = tile.data
 
@@ -358,25 +331,12 @@ class Layer(object):
             tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
 
         elif tile.type == "CPY":
-            #if image.index in (14,15,16) and tile.index in (79,81):
             if tile.ref_local_tile == True:
                 ref_tile = image.tiles[tile.ref_local_tile_index]
 
                 if ref_tile.type == "CPY":
-                    # If the locally referred tile is of type 'CPY', then Resolve
-                    # further from previous image-tile(s)
-
-                    # if image.first_info == 6 or image.first_info == image.tile_size:
-                    #     prev_image = self.images[image.index - 1]
-                    # elif image.first_info == 2:
-                    #     prev_image = self.images[image.second_info]
-                    # else:
-                    #     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
-
+                    # reference & resolve local tile
                     local_tile = image.tiles[tile.ref_local_tile_index]
-
-                    # if image.index in (14,15,16) and tile.index in (79,81):
-                    print(f"{pfx} stepping aside from local-reffed tile: {tile.index}, to tile: {local_tile.index}")
                     tile_data = self._resolve_tile_data(image, local_tile, indent)
                 else:
                     # copy the image-data from local image
@@ -404,7 +364,6 @@ class Layer(object):
                     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
 
                 prev_tile = prev_image.tiles[tile.ref_local_tile_index]
-                print(f"{pfx} stepping down from local-reffed tile: {tile.index}, to tile: {prev_tile.index}")
                 tile_data = self._resolve_tile_data(prev_image, prev_tile, indent + 1)
 
         return tile_data
