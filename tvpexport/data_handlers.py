@@ -6,7 +6,7 @@ Issued under the "do what you like with it - I take no responsibility" licence
 import sys
 import struct
 import numpy as np
-# import cv2
+import cv2
 from . import decoders
 import logging
 
@@ -251,7 +251,7 @@ class Layer(object):
 
     def frame(self, index: int):
         """ Return a frame/image, given the index of the timeline
-        
+
         Args:
             index (int): timeline-position (starts with 0)
 
@@ -284,12 +284,14 @@ class Layer(object):
                 image = self.images[image.index - 1]
 
         for tile in image.tiles:
+            print(f"TILE: {tile.index} =========================================== ")
             if image.type == "DBOD":
                 tile_data = tile.data
             else:  # SRAW
-                tile_data = self._resolve_tile_data(image, tile)
+                indent = 0
+                tile_data = self._resolve_tile_data(image, tile, indent)
 
-            # Debugging: print the index of the tile onto the tile.
+            # # Debugging: print the index of the tile onto the tile.
             # tile_data[5:25, 1:50, :3] = (0,0,255)
             # tile_data[5:25, 1:50, 3] = 150
             # cv2.putText(
@@ -300,9 +302,36 @@ class Layer(object):
             y = (tile.index * image.tile_size) // image.max_tilewidth * image.tile_size
             image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
 
+            # # TVPaint 9 stores pixeldata as ABGR
+            # img = image.result
+            # try:
+            #     alpha = img[:, :, 3].astype(float) / 255
+            #     fg = alpha[:, :, np.newaxis] * img[:, :, :3].astype(float) / 255
+
+            #     background = (
+            #         np.zeros(shape=(img.shape[0], img.shape[1], 3), dtype=float) + 0.5
+            #     )
+            #     bg = (1 - alpha[:, :, np.newaxis]) * background
+            #     res = cv2.add(fg, bg)
+            #     res = (res * 255).astype(np.uint8)
+
+            #     window_name = "Image Fit to Display"
+            #     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            #     target_width = 1024
+            #     target_height = 1024
+            #     cv2.resizeWindow(window_name, target_width, target_height)
+            #     cv2.imshow(window_name, res)
+            #     x = cv2.waitKey(0)
+            #     if x==27:    # Esc key to stop
+            #         cv2.destroyAllWindows()
+            #         sys.exit(0)
+            # except:
+            #     raise
+
+
         return image.result
 
-    def _resolve_tile_data(self, image, tile):
+    def _resolve_tile_data(self, image, tile, indent):
         """Resolve tile-data
 
         Args:
@@ -316,10 +345,12 @@ class Layer(object):
         Returns:
             numpy.ndarray(): tile-(image)data
         """
+        pfx = indent * "----"
 
         tile.width = self.images[0].tiles[tile.index].width
         tile.height = self.images[0].tiles[tile.index].height
 
+        print(f"{pfx} at image: {image.index}, current tile({tile.type}): {tile.index}, ref-local={tile.ref_local_tile} ref to tile -> {tile.ref_local_tile_index}")
         if tile.type == "RAW":
             tile_data = tile.data
 
@@ -327,28 +358,31 @@ class Layer(object):
             tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
 
         elif tile.type == "CPY":
+            #if image.index in (14,15,16) and tile.index in (79,81):
             if tile.ref_local_tile == True:
-                ref_local_tile_index = tile.lookup_tile_index
-                ref_tile = image.tiles[ref_local_tile_index]
+                ref_tile = image.tiles[tile.ref_local_tile_index]
 
                 if ref_tile.type == "CPY":
                     # If the locally referred tile is of type 'CPY', then Resolve
                     # further from previous image-tile(s)
 
-                    if image.first_info == 6 or image.first_info == image.tile_size:
-                        prev_image = self.images[image.index - 1]
-                    elif image.first_info == 2:
-                        prev_image = self.images[image.second_info]
-                    else:
-                        raise RuntimeError(f"Unknown 'First info': {image.first_info}")
+                    # if image.first_info == 6 or image.first_info == image.tile_size:
+                    #     prev_image = self.images[image.index - 1]
+                    # elif image.first_info == 2:
+                    #     prev_image = self.images[image.second_info]
+                    # else:
+                    #     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
 
-                    prev_tile = prev_image.tiles[ref_local_tile_index]
-                    tile_data = self._resolve_tile_data(prev_image, prev_tile)
+                    local_tile = image.tiles[tile.ref_local_tile_index]
+
+                    # if image.index in (14,15,16) and tile.index in (79,81):
+                    print(f"{pfx} stepping aside from local-reffed tile: {tile.index}, to tile: {local_tile.index}")
+                    tile_data = self._resolve_tile_data(image, local_tile, indent)
                 else:
                     # copy the image-data from local image
-                    xpos = (ref_local_tile_index * image.tile_size) % image.max_tilewidth
+                    xpos = (tile.ref_local_tile_index * image.tile_size) % image.max_tilewidth
                     ypos = (
-                        ref_local_tile_index * image.tile_size // image.max_tilewidth
+                        tile.ref_local_tile_index * image.tile_size // image.max_tilewidth
                     ) * image.tile_size
                     tile_data = image.result[
                         ypos : ypos + image.tile_size, xpos : xpos + image.tile_size
@@ -358,7 +392,7 @@ class Layer(object):
                 # tile_data[20:50, 1:50, :3] = (0, 255, 0)
                 # tile_data[20:50, 1:50, 3] = 200
                 # cv2.putText(
-                #     tile_data, str(local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
+                #     tile_data, str(tile.ref_local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
                 # )
             else:
 
@@ -369,8 +403,9 @@ class Layer(object):
                 else:
                     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
 
-                prev_tile = prev_image.tiles[tile.index]
-                tile_data = self._resolve_tile_data(prev_image, prev_tile)
+                prev_tile = prev_image.tiles[tile.ref_local_tile_index]
+                print(f"{pfx} stepping down from local-reffed tile: {tile.index}, to tile: {prev_tile.index}")
+                tile_data = self._resolve_tile_data(prev_image, prev_tile, indent + 1)
 
         return tile_data
 
@@ -458,9 +493,9 @@ class Image(object):
         if self.type == "SRAW":
             unpack_uint = struct.Struct('>I').unpack_from
             data_offset = 0
-            total_length = len(self.raw_data)
+            # total_length = len(self.raw_data)
 
-            # We already assume tile_size is 64
+            # TODO: Don't assume tile_size is 64
             _tile_size = unpack_uint(self.raw_data, data_offset)[0]
             data_offset += 4
 
@@ -482,7 +517,7 @@ class Image(object):
                     )
 
                     data_offset += 4
-                    tile.lookup_tile_index = unpack_uint(self.raw_data, data_offset)[0]
+                    tile.ref_local_tile_index = unpack_uint(self.raw_data, data_offset)[0]
                     data_offset += 4
 
                 else:
@@ -504,7 +539,7 @@ class ImageTile(object):
         self.index = index
         self.type = type_name
         self.ref_local_tile = False
-        self.lookup_tile_index = 0
+        self.ref_local_tile_index = 0
         self.width = 0
         self.height = 0
         self.rle_data = bytes()
