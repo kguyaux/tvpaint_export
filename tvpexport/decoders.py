@@ -191,18 +191,15 @@ def decode_LRHD(data: bytes):
 
     TODO: check word-lengths
     """
-    settings = []
-    for i in range(0, len(data) // 2):
-        setting = struct.unpack_from(">H", data, offset=i * 2)[0]
-        settings.append(setting)
-
+    settings = struct.unpack_from(">52H", data)
     return {
         "num_images": settings[7],
         "start_frame": settings[3],
         "end_frame": settings[5],
         "transperency": settings[9],
-        "visible": bool(settings[15] & 0b00000001),
-        "locked": bool(settings[15] & 0b00010000),
+        "visible": bool(settings[15] & 0b0000000000000001),
+        "locked": bool(settings[15] & 0b0000000000010000),
+        'blend_mode': settings[30]
     }
 
 

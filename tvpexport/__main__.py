@@ -54,7 +54,7 @@ def save_img(tvpp, layer, img, index, output_dir):
     if not os.path.exists(output_dir):
         raise FileNotFoundError(f"'{output_dir}' does not exist")
 
-    file_name = f"{layer.name.replace('_', '-')}_{index:04d}.png"
+    file_name = f"{layer.index:03d}_{index:04d}.png"
     file_path = os.path.join(output_dir, file_name)
     if tvpp.tvpaint_version[0] == 9:
         img = img[:, :, ::-1]
@@ -82,6 +82,12 @@ def main():
         help="index of the layer to inspect (from top to bottom = [0:])"
     )
 
+    parser.add_argument('-a',
+        "--all_layers",
+        action="store_true",
+        help="Process all layers"
+    )
+
     parser.add_argument('-f',
         "--frame",
         type=int,
@@ -92,7 +98,6 @@ def main():
         action="store_true",
         help="Display image."
     )
-
     parser.add_argument('-i',
         "--interactive",
         action="store_true",
@@ -103,47 +108,71 @@ def main():
         type=str,
         help="Output-dir of where to save images(overwrites!)."
     )
+    parser.add_argument('-p',
+        "--print_info",
+        action="store_true",
+        help="Print info of everything (project, clip, scene, layer)"
+    )
 
     args = parser.parse_args()
     if args.debug:
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.DEBUG)
 
-
     tvptree = TvpProject(args.tvpp)
-    clip = Clip(tvptree)
-    pprint(clip.metadata)
+    scene = tvptree.get_scene_tree(scene_index=0)
+    clip = Clip(tvptree, scene_index=0, clip_index=0)
+
+    if args.print_info:
+        pprint(tvptree.metadata)
+        pprint(tvptree.read_scene_metadata(scene))
+        pprint(clip.metadata)
+
+    layers = []
+    if args.all_layers:
+        layers = clip.layers
 
     if args.layer is not None:
-        layer = clip.layers[args.layer]
-        print("numlayers:", len(clip.layers))
-        pprint(layer.settings)
+        layers = [clip.layers[args.layer]]
+
+    for layer in layers:
+        if args.print_info:
+            pprint(layer.settings)
+
+        # for faster testing the imageprocessing, you can comment this out.
+        if not args.output_dir and not args.show:
+            sys.exit(0)
+
         if args.frame is not None:
             start_time = time.time()
             image = layer.frame(args.frame)
             logger.info(
-                f"Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds"
+                f"Layer {layer.index} (\"{layer.name}\"), Frame {i}, processing took: {time.time() - start_time:.6f} seconds"
             )
 
             if args.show:
-                show_window(tvptree, clip.bgp1, image)
+                if args.interactive:
+                    show_window(tvptree, clip.bgp1, image)
+                else:
+                    show_window(tvptree, clip.bgp1, image, timeout=10)
+
             if args.output_dir:
-                save_img(tvptree, layer, img, args.frame, args.output_dir)
+                save_img(tvptree, layer, image, args.frame, args.output_dir)
         else:
             end_frame = max([l.settings['end_frame'] for l in clip.layers])
             for i in range(end_frame + 1):
                 start_time = time.time()
-                img = layer.frame(i)
+                image = layer.frame(i)
                 logger.info(
-                    f"Frame {i}, processing took: {time.time() - start_time:.6f} seconds"
+                    f"Layer {layer.index} (\"{layer.name}\") Frame {i}, processing took: {time.time() - start_time:.6f} seconds"
                 )
                 if args.show:
                     if args.interactive:
-                        show_window(tvptree, clip.bgp1, img)
+                        show_window(tvptree, clip.bgp1, image)
                     else:
-                        show_window(tvptree, clip.bgp1, img, timeout=100)
+                        show_window(tvptree, clip.bgp1, image, timeout=10)
                 if args.output_dir:
-                    save_img(tvptree, layer, img, i, args.output_dir)
+                    save_img(tvptree, layer, image, i, args.output_dir)
 
 
 if __name__ == "__main__":
