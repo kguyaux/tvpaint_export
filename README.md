@@ -1,9 +1,12 @@
-TVPAINT-EXPORT (v1.1.0)
+TVPAINT-EXPORT (v1.1.1)
 ==============
 
 Export images from a tvpaint-project(*.tvpp). Supported tvpaint-versions are 9,10, & 11. (12+ is untested)
 
 ### Changelog:
+- version 1.1.1  (6 july 2025)
+Some optimizations. faster RLE- & Unzip-decompression. Prevented unnecessary RLE-decompress
+
 - version 1.1.0  (4 july 2025)
 Improved the tile-resolving. It should be free of bugs now (No more distorted tiles)
 Also some cleanup, some more data-handling. You also should be able to read the blendmode of a layer (Layer(...).settings['blendmode'])
