@@ -147,7 +147,7 @@ def main():
             start_time = time.time()
             image = layer.frame(args.frame)
             logger.info(
-                f"Layer {layer.index} (\"{layer.name}\"), Frame {i}, processing took: {time.time() - start_time:.6f} seconds"
+                f"Layer {layer.index} (\"{layer.name}\"), Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds"
             )
 
             if args.show:
