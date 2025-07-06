@@ -457,7 +457,7 @@ class Image(object):
         if self.type == "DBOD":
             image_data = decoders.decode_DBOD(self.raw_data, self.width, self.height)
             for tile_index in range(0, self.num_tiles):
-                tile = ImageTile("RAW", self.index, tile_index, tile_cache=tile_cache)
+                tile = ImageTile("RAW", self.index, tile_index)
                 xpos = (tile_index * self.tile_size) % self.max_tilewidth
                 ypos = (
                     tile_index * self.tile_size // self.max_tilewidth * self.tile_size
@@ -488,7 +488,7 @@ class Image(object):
             tile_amount = unpack_uint(self._raw_data, data_offset)[0]
             data_offset += 4
             for tile_index in range(tile_amount):
-                tile = ImageTile("", self.index, tile_index, tile_cache=tile_cache)
+                tile = ImageTile("", self.index, tile_index)
                 magicnumber = unpack_uint(self.raw_data, data_offset)[0]
                 data_offset += 4
                 if magicnumber == 0:
@@ -530,14 +530,16 @@ class ImageTile(object):
 
     @property
     def data(self):
-        cached_tile_data = self.cache.get_from_cache(self.image_index, self.index)
-        if cached_tile_data is not None:
-            return cached_tile_data
+        # cached_tile_data = self.cache.get_from_cache(self.image_index, self.index)
+        # if cached_tile_data is not None:
+        #     return cached_tile_data
 
-        if self.rle_data and self._data.size == 0:
+        if self.rle_data:
+            #print(f"unpacking rle: {self.width}")
             self._data = decoders.decode_DBOD(self.rle_data, self.width, self.height)
+            self.rle_data = bytes()
 
-        self.cache.append((self.image_index, self.index, self._data))
+        # self.cache.append((self.image_index, self.index, self._data))
         return self._data
 
     @data.setter
@@ -549,24 +551,25 @@ class ImageTile(object):
 class TileCache(object):
 
     def __init__(self):
-        self.cache = CircularDict(maxlen=10)
+        self.cache = CircularDict(maxlen=1000)
 
-    def append(self, dd):
-        image_index, tile_index, img_data = dd
+    def append(self, data_tuple):
+        image_index, tile_index, img_data = data_tuple
         key = f"{image_index:04d}_{tile_index:05d}"
         if key in self.cache:
             return
-        self.cache[key] = img_data
-        print("hahahaha", len(self.cache.keys()))
+        if isinstance(img_data, np.ndarray) and img_data.shape != ():
+            self.cache[key] = img_data
 
     def get_from_cache(self, image_index, tile_index):
         key = f"{image_index:04d}_{tile_index:05d}"
+        #print(f"fetchinG: {key}, len cache: {len(self.cache.keys())}")
         if key in self.cache:
-            print(f"fetched {image_index} {tile_index}: {key}")
+            #print(f"fetched {image_index} {tile_index}: {key}")
             ret = self.cache[key]
-            print(type(ret))
             return ret
         else:
+            # print("poop")
             return None
 
 

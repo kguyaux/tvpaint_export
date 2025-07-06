@@ -141,15 +141,15 @@ def main():
         if args.print_info:
             pprint(layer.settings)
 
-        # for faster testing the imageprocessing, you can comment this out.
-        if not args.output_dir and not args.show:
-            sys.exit(0)
+        # # for faster testing the imageprocessing, you can comment this out.
+        # if not args.output_dir and not args.show:
+        #     sys.exit(0)
 
         if args.frame is not None:
             start_time = time.time()
             image = layer.frame(args.frame)
             logger.info(
-                f"Layer {layer.index} (\"{layer.name}\"), Frame {i}, processing took: {time.time() - start_time:.6f} seconds"
+                f"Layer {layer.index} (\"{layer.name}\"), Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds"
             )
 
             if args.show:
@@ -192,4 +192,4 @@ if __name__ == "__main__":
     stats.reverse_order()
 
     # 5. Print the stats
-    stats.print_stats()
+    #stats.print_stats()
