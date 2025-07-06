@@ -224,14 +224,17 @@ def decode_ZCHK(data: bytes):
 
     """
     offset = 0
-    num_blocks = struct.unpack_from(">I", data, 16)[0]
+
+    # precompile unpack_from to improve speed
+    unpack_uint = struct.Struct('>I').unpack_from
+    num_blocks = unpack_uint(data, 16)[0]
     offset += 20
     result = bytearray()
     for _i in range(num_blocks):
         offset += 4
-        _uncompr_size = struct.unpack_from(">I", data, offset)[0]
+        _uncompr_size = unpack_uint(data, offset)[0]
         offset += 4
-        compr_size = struct.unpack_from(">I", data, offset)[0]
+        compr_size = unpack_uint(data, offset)[0]
         offset += 4
         zblock = data[offset : offset + compr_size]  # read compressed block
         decomp = zlib.decompress(zblock)
@@ -285,7 +288,7 @@ def decode_DPEL(contents):
     pass
 
 def decode_DLOC(data):
-    return struct.unpack_from(">HHHH", data)
+    return struct.unpack(">HHHH", data)
 
 def decode_BGMD(contents):
     """Unknown"""
@@ -300,12 +303,12 @@ def decode_CRLR(contents):
     pass
 
 def decode_BGP1(data):
-    return struct.unpack_from("BBBB", data)
+    return struct.unpack("BBBB", data)
 
 
 def decode_BGP2(data):
     """ Backgroundcolorpattern 2"""
-    return struct.unpack_from("BBBB", data)
+    return struct.unpack("BBBB", data)
 
 
 def decode_ANNO(contents):

@@ -451,9 +451,6 @@ class Image(object):
 
     def create_tiles(self):
         _trigger_unzip = self.first_info  # TODO: improve this
-
-        tile_cache = TileCache()
-
         if self.type == "DBOD":
             image_data = decoders.decode_DBOD(self.raw_data, self.width, self.height)
             for tile_index in range(0, self.num_tiles):
@@ -530,46 +527,13 @@ class ImageTile(object):
 
     @property
     def data(self):
-        # cached_tile_data = self.cache.get_from_cache(self.image_index, self.index)
-        # if cached_tile_data is not None:
-        #     return cached_tile_data
-
         if self.rle_data:
-            #print(f"unpacking rle: {self.width}")
             self._data = decoders.decode_DBOD(self.rle_data, self.width, self.height)
             self.rle_data = bytes()
 
-        # self.cache.append((self.image_index, self.index, self._data))
         return self._data
 
     @data.setter
     def data(self, data):
         self._data = data
-
-
-
-class TileCache(object):
-
-    def __init__(self):
-        self.cache = CircularDict(maxlen=1000)
-
-    def append(self, data_tuple):
-        image_index, tile_index, img_data = data_tuple
-        key = f"{image_index:04d}_{tile_index:05d}"
-        if key in self.cache:
-            return
-        if isinstance(img_data, np.ndarray) and img_data.shape != ():
-            self.cache[key] = img_data
-
-    def get_from_cache(self, image_index, tile_index):
-        key = f"{image_index:04d}_{tile_index:05d}"
-        #print(f"fetchinG: {key}, len cache: {len(self.cache.keys())}")
-        if key in self.cache:
-            #print(f"fetched {image_index} {tile_index}: {key}")
-            ret = self.cache[key]
-            return ret
-        else:
-            # print("poop")
-            return None
-
 
