@@ -233,55 +233,25 @@ def decode_ZCHK(data: bytes):
         bytearray: Uncompressed data
 
     """
-
-    pixel_bytes = 4
-    data_mv = memoryview(data)
-    data_length = len(data_mv)
-    unpacked = bytearray()
-    offset = 0
-    while offset < data_length:
-        magicnumber = data_mv[offset]
-        start = offset + 1
-        if magicnumber <= 0x7B:  # <=123
-            size = magicnumber + 1
-            length = size * pixel_bytes
-            end = start + length
-            unpacked.extend(data_mv[start:end])
-
-        elif magicnumber >= 0x85:  # >=133
-            multiplier = 255 - magicnumber + 2
-            end = start + pixel_bytes
-            chunk = bytearray(data_mv[start: end])
-            unpacked.extend(chunk * multiplier)
-        else:
-            if offset == len(data) - 1:
-                break
-            end = offset + 1
-
-        offset = end
-    # return unpacked
-
-
-
     offset = 0
     data_mv = memoryview(data)
 
-    # precompile unpack_from to improve speed
-    # unpack_uint = struct.Struct('>I').unpack_from
-    num_blocks = struct.unpack('>I', data_mv[16:4])
+    unpack_uint = struct.Struct('>I').unpack_from
+    num_blocks = unpack_uint(data_mv[16:20])[0]
     offset += 20
     result = bytearray()
     for _i in range(num_blocks):
         offset += 4
-        _uncompr_size = struct.unpack('>I', data_mv[offset:offset+4])
+        uncompr_size = unpack_uint(data_mv[offset:offset+4])[0]
         offset += 4
-        # compr_size = unpack_uint(data, offset)[0]
-        compr_size = struct.unpack('>I', data_mv[offset:offset+4])
+        zblock_size = unpack_uint(data_mv[offset:offset+4])[0]
         offset += 4
-        zblock = data_mv[offset : offset + compr_size]  # read compressed block
-        decomp = zlib.decompress(zblock)
-        result += decomp
-        offset += compr_size
+        zblock = data_mv[offset : offset + zblock_size]  # read compressed block
+        uncompressed = zlib.decompress(zblock)
+        if len(uncompressed) != uncompr_size:
+            raise RuntimeError("Error while decompressing ZCHK-block. Corrupt file?")
+        result += uncompressed
+        offset += zblock_size
     return result
 
 
