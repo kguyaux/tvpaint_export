@@ -16,6 +16,7 @@ I tested the code with some tvpaint-files, from tvpaint-versions 9, 10 & 11. The
 If you encounter errors, then let me know or file an issue.
 
 ### TODO:
+- compositing; being able to merge layers.
 - Make use of (tile)caching to make it faster.
 - handle multiple clips and scenes. I don't have example-tvp-projects that contain multiple scenes/clips. Expect errors when your project has those. I need an example to fix the code for this, so If someone has an example-tvpp with multiple clips/scenes and can send it to me then that would be nice :-)
 
