@@ -160,13 +160,13 @@ def unpack_RLE(data):
             size = magicnumber + 1
             length = size * pixel_bytes
             end = start + length
-            unpacked.extend(data_mv[start:end])
+            unpacked += data_mv[start:end]
 
         elif magicnumber >= 0x85:  # >=133
             multiplier = 255 - magicnumber + 2
             end = start + pixel_bytes
             chunk = bytearray(data_mv[start: end])
-            unpacked.extend(chunk * multiplier)
+            unpacked += (chunk * multiplier)
         else:
             if offset == len(data) - 1:
                 break
