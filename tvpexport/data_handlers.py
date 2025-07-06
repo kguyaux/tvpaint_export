@@ -6,7 +6,7 @@ Issued under the "do what you like with it - I take no responsibility" licence
 import sys
 import struct
 import numpy as np
-import cv2
+# import cv2
 from . import decoders
 from circular_dict import CircularDict
 import logging
@@ -204,7 +204,7 @@ class Clip(object):
             if ident == "LNAM":
                 layer_index += 1  # LNAM is the first item of a layer, so up the index
                 layer_name = decoders.decode_LNAM(data)
-                new_layer = Layer(layer_name, self.width, self.height)
+                new_layer = Layer(layer_index, layer_name, self.width, self.height)
                 self.layers.append(new_layer)
 
             if ident == "LRHD":
@@ -216,7 +216,7 @@ class Clip(object):
             if ident == "LRSR":  # it's a ctg-layer for layer above
                 layer_index += 1
                 new_layer = Layer(
-                    self.layers[layer_index - 1].name, self.width, self.height
+                    layer_index, self.layers[layer_index - 1].name, self.width, self.height
                 )
                 new_layer.settings = self.layers[layer_index - 1].settings
                 new_layer.is_ctg = True
@@ -244,7 +244,8 @@ class Layer(object):
     UDAT  scribbledata(?)
     """
 
-    def __init__(self, name, width, height):
+    def __init__(self, index, name, width, height):
+        self.index = index
         self.name = name
         self.is_ctg = False
         self.images = []
@@ -252,15 +253,16 @@ class Layer(object):
         self.height = height
         self.settings = {}
 
-    def frame(self, index):
-        """_summary_
+    def frame(self, index: int):
+        """ Return a frame/image, given the index of the timeline
 
         Args:
-            index (_type_): _description_
+            index (int): timeline-position (starts with 0)
 
         Returns:
-            _type_: _description_
+            numpy.ndarray(): image-data
         """
+
         start_frame = self.settings["start_frame"]
         frame_index = index - start_frame
         if frame_index < 0 or frame_index >= len(self.images):
@@ -269,13 +271,13 @@ class Layer(object):
             return self.construct_image(frame_index)
 
     def construct_image(self, img_index):
-        """_summary_
+        """ Retreive an image from the imagelist.
 
         Args:
-            img_index (_type_): _description_
+            img_index (int): index of the image
 
         Returns:
-            _type_: _description_
+            numoy.ndarray(): imagedata
         """
         image = self.images[img_index]
 
@@ -289,15 +291,15 @@ class Layer(object):
             if image.type == "DBOD":
                 tile_data = tile.data
             else:  # SRAW
-                tile_data = self._resolve_tile_data(image, tile)
+                indent = 0
+                tile_data = self._resolve_tile_data(image, tile, indent)
 
-            # Debugging:
-            # if True:
-            #     tile_data[5:25, 1:50, :3] = (0,0,255)
-            #     tile_data[5:25, 1:50, 3] = 150
-            #     cv2.putText(
-            #         tile_data, str(tile.index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
-            #     )
+            # # Debugging: print the index of the tile onto the tile.
+            # tile_data[5:25, 1:50, :3] = (0,0,255)
+            # tile_data[5:25, 1:50, 3] = 150
+            # cv2.putText(
+            #     tile_data, str(tile.index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
+            # )
 
             x = (tile.index * image.tile_size) % image.max_tilewidth
             y = (tile.index * image.tile_size) // image.max_tilewidth * image.tile_size
@@ -308,21 +310,25 @@ class Layer(object):
                 print(tile.data.shape)
                 raise
 
+
         return image.result
 
-    def _resolve_tile_data(self, image, tile):
+    def _resolve_tile_data(self, image, tile, indent):
         """Resolve tile-data
 
         Args:
-            image (_type_): _description_
-            tile (_type_): _description_
+            image (Image()): Image()-object
+            tile (ImageTile()): Tile()-object
 
         Raises:
-            RuntimeError: _description_
+            RuntimeError: 'Crash' when unknown image-header-data is discovered.
+            So we can implement it, afterwards.
 
         Returns:
-            _type_: _description_
+            numpy.ndarray(): tile-(image)data
         """
+        pfx = indent * "----"
+
         tile.width = self.images[0].tiles[tile.index].width
         tile.height = self.images[0].tiles[tile.index].height
 
@@ -334,40 +340,28 @@ class Layer(object):
             # tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
 
         elif tile.type == "CPY":
-            # traverse back to previous imagetiles
             if tile.ref_local_tile == True:
-                ref_local_tile_index = tile.lookup_tile_index
-                ref_tile = image.tiles[ref_local_tile_index]
-                # print(f">>>: Tile {tile.index} refers to local: {ref_tile.index} ({ref_tile.type} to local: {ref_tile.ref_local_tile})")
+                ref_tile = image.tiles[tile.ref_local_tile_index]
 
                 if ref_tile.type == "CPY":
-                    # If the locally referred tile is of type 'CPY', then Resolve
-                    # further
-
-                    if image.first_info == 6 or image.first_info == image.tile_size:
-                        prev_image = self.images[image.index - 1]
-                    elif image.first_info == 2:
-                        prev_image = self.images[image.second_info]
-                    else:
-                        raise RuntimeError(f"Unknown 'First info': {image.first_info}")
-
-                    prev_tile = prev_image.tiles[ref_local_tile_index]
-                    tile_data = self._resolve_tile_data(prev_image, prev_tile)
+                    # reference & resolve local tile
+                    local_tile = image.tiles[tile.ref_local_tile_index]
+                    tile_data = self._resolve_tile_data(image, local_tile, indent)
                 else:
                     # copy the image-data from local image
-                    xpos = (ref_local_tile_index * image.tile_size) % image.max_tilewidth
+                    xpos = (tile.ref_local_tile_index * image.tile_size) % image.max_tilewidth
                     ypos = (
-                        ref_local_tile_index * image.tile_size // image.max_tilewidth
+                        tile.ref_local_tile_index * image.tile_size // image.max_tilewidth
                     ) * image.tile_size
                     tile_data = image.result[
                         ypos : ypos + image.tile_size, xpos : xpos + image.tile_size
                     ].copy()
 
-                # # Print local_tile_index
+                # # Debugging: print local_tile_index onto the tile
                 # tile_data[20:50, 1:50, :3] = (0, 255, 0)
                 # tile_data[20:50, 1:50, 3] = 200
                 # cv2.putText(
-                #     tile_data, str(local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
+                #     tile_data, str(tile.ref_local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
                 # )
             else:
 
@@ -378,8 +372,8 @@ class Layer(object):
                 else:
                     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
 
-                prev_tile = prev_image.tiles[tile.index]
-                tile_data = self._resolve_tile_data(prev_image, prev_tile)
+                prev_tile = prev_image.tiles[tile.ref_local_tile_index]
+                tile_data = self._resolve_tile_data(prev_image, prev_tile, indent + 1)
 
         return tile_data
 
@@ -419,10 +413,6 @@ class Image(object):
             self._result = np.zeros(shape=(self.height, self.width, 4), dtype=np.uint8)
         return self._result
 
-    #@result.setter
-    #def result(self, value):
-    #    self._result = value
-
     @property
     def raw_data(self):
         if self.type == "ZCHK":
@@ -460,8 +450,6 @@ class Image(object):
         return self._tiles
 
     def create_tiles(self):
-        """_summary_
-        """
         _trigger_unzip = self.first_info  # TODO: improve this
 
         tile_cache = TileCache()
@@ -486,9 +474,9 @@ class Image(object):
             unpack_uint = struct.Struct('>I').unpack_from
 
             data_offset = 0
-            total_length = len(self.raw_data)
+            # total_length = len(self.raw_data)
 
-            # We already assume tile_size is 64
+            # TODO: Don't assume tile_size is 64
             _tile_size = unpack_uint(self.raw_data, data_offset)[0]
             data_offset += 4
 
@@ -510,7 +498,7 @@ class Image(object):
                     )
 
                     data_offset += 4
-                    tile.lookup_tile_index = unpack_uint(self.raw_data, data_offset)[0]
+                    tile.ref_local_tile_index = unpack_uint(self.raw_data, data_offset)[0]
                     data_offset += 4
 
                 else:
@@ -533,7 +521,7 @@ class ImageTile(object):
         self.image_index = image_index
         self.type = type_name
         self.ref_local_tile = False
-        self.lookup_tile_index = 0
+        self.ref_local_tile_index = 0
         self.width = 0
         self.height = 0
         self.cache = tile_cache

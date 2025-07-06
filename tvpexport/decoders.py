@@ -44,8 +44,8 @@ def print_bytes(func):
     """ A helper-decorator to print the bytes in hex.
     """
     def wrapper(*args, **kwargs):
-        data = args[0]
-        logger.debug(f"{func.__name__}: {data}")
+        data = args[1]
+        logger.debug(f"{data}")
     return wrapper
 
 
@@ -62,8 +62,6 @@ def dump_bytes(with_uid=False):
                 uniq = "_" + uuid.uuid4().hex[:8]
             else:
                 uniq = ""
-            if not os.path.exists(BYTEDUMP_DIR):
-                os.makedirs(BYTEDUMP_DIR)
             with open(
                 os.path.join(
                     BYTEDUMP_DIR,
@@ -140,7 +138,7 @@ def parse_utf16_dictdata(data: bytes):
 ################################################################
 
 def unpack_RLE(data):
-    """Return uncompressed data from RLE-compressed data.
+    """Return imagedata from RLE-compressed data.
 
     Args:
         data: (bytes) a datablock
@@ -148,34 +146,23 @@ def unpack_RLE(data):
         bytearray(): RGBA data (8bit)
     """
     pixel_bytes = 4
-    data_mv = memoryview(data)
-    data_length = len(data_mv)
-
     unpacked = bytearray()
     offset = 0
-
-    while offset < data_length:
-        # _byte = struct.unpack_from("B", data, offset=offset)[0]
-        magicnumber = data_mv[offset]
-        start = offset + 1
-        if magicnumber <= 0x7B:  # <=123
-            size = magicnumber + 1
+    while offset < len(data):
+        _byte = struct.unpack_from("B", data, offset=offset)[0]
+        if _byte <= 0x7B:  # <=123
+            size = _byte + 1
             length = size * pixel_bytes
-            end = start + length
-            unpacked.extend(data_mv[start:end])
-            offset = end
-
-        elif magicnumber >= 0x85:  # >=133
-            multiplier = 255 - magicnumber + 2
-            end = start + pixel_bytes
-            chunk = bytearray(data_mv[start: end])
-            unpacked.extend(chunk * multiplier)
+            result = data[offset + 1 : offset + length + 1]
+            offset += length + 1
+        elif _byte >= 0x85:  # >=133
+            multiplier = 255 - _byte + 2
+            result = data[offset + 1 : offset + pixel_bytes + 1] * multiplier
+            offset += pixel_bytes + 1
         else:
             if offset == len(data) - 1:
                 break
-            end = offset + 1
-
-        offset = end
+        unpacked.extend(result)
     return unpacked
 
 
@@ -204,18 +191,15 @@ def decode_LRHD(data: bytes):
 
     TODO: check word-lengths
     """
-    settings = []
-    for i in range(0, len(data) // 2):
-        setting = struct.unpack_from(">H", data, offset=i * 2)[0]
-        settings.append(setting)
-
+    settings = struct.unpack_from(">52H", data)
     return {
         "num_images": settings[7],
         "start_frame": settings[3],
         "end_frame": settings[5],
         "transperency": settings[9],
-        "visible": bool(settings[15] & 0b00000001),
-        "locked": bool(settings[15] & 0b00010000),
+        "visible": bool(settings[15] & 0b0000000000000001),
+        "locked": bool(settings[15] & 0b0000000000010000),
+        'blend_mode': settings[30]
     }
 
 
@@ -292,64 +276,61 @@ def decode_XS24(contents):
     """ Unknown """
     pass
 
-def decode_DGBL(data):
+def decode_DGBL(contents):
     """Unknown"""
-    return data
+    pass
 
-def decode_DPEL(data):
+def decode_DPEL(contents):
     """Unknown"""
-    return struct.unpack('>10H', data)
+    pass
 
 def decode_DLOC(data):
     return struct.unpack_from(">HHHH", data)
 
-def decode_BGMD(data):
+def decode_BGMD(contents):
     """Unknown"""
-    return data
+    pass
 
-def decode_ARAT(data):
-    """ 2 values of 1000000"""
-    return struct.unpack('>II', data)
-
-def decode_CRLR(data):
+def decode_ARAT(contents):
     """Unknown"""
-    return struct.unpack('>I', data)
+    pass
+
+def decode_CRLR(contents):
+    """Unknown"""
+    pass
 
 def decode_BGP1(data):
-    """ Background colorpattern1"""
     return struct.unpack_from("BBBB", data)
 
 
 def decode_BGP2(data):
-    """ Background colorpattern2"""
+    """ Backgroundcolorpattern 2"""
     return struct.unpack_from("BBBB", data)
 
-def decode_ANNO(data):
-    """ Annotation """
-    return [t.decode("utf8") for t in data.partition(b'\x00') if t and t != b'\x00']
 
-def decode_FRAT(data):
+def decode_ANNO(contents):
     """Unknown"""
-    return data
+    pass
 
-
-def decode_FILD(data):
+def decode_FRAT(contents):
     """Unknown"""
-    return struct.unpack('>II', data)
+    pass
 
-def decode_MARK(data):
-    """mark in/out data?"""
-    if len(data) == 16:
-        return struct.unpack('>IIII', data)
-
-def decode_XSHT(data):
+def decode_FILD(contents):
     """Unknown"""
-    return data
+    pass
 
-def decode_TLNT(data):
+def decode_MARK(contents):
     """Unknown"""
-    # return struct.unpack('>I', data)
-    return data
+    pass
+
+def decode_XSHT(contents):
+    """Unknown"""
+    pass
+
+def decode_TLNT(contents):
+    """Unknown"""
+    pass
 
 def decode_SPAR(contents):
     """Unknown"""
