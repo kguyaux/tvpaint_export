@@ -31,12 +31,12 @@ class Clip(object):
         XS24  Thumbnail
         DGBL
         DPEL
-        DLOC
+        DLOC  4 integers: (width, height, ?, ?)
         BGMD
         ARAT
         CRLR
-        BGP1
-        BGP2
+        BGP1  background pattern color1
+        BGP2  background pattern color2
         ANNO
         FRAT
         FILD
@@ -48,32 +48,9 @@ class Clip(object):
     layer ( * n):
         LNAM  layername
         LNAW  layername
-        LRHD
-        ZCHK  zipped imagedata (DBOD or SRAW)
-        DBOD  First imagedata, full image RLE-encoded
-        SRAW  imagedata related to DBOD, pieces of RLE-encoded ata
-:
-        XS24  Thumbnail
-        DGBL
-        DPEL
-        DLOC
-        BGMD
-        ARAT
-        CRLR
-        BGP1
-        BGP2
-        ANNO
-        FRAT
-        FILD
-        MARK
-        XSHT  Xsheet(?)
-        TLNT  80 bytes of ?
-        SPAR  ?
-
-    layer ( * n):
-        LNAM  layername
-        LNAW  layername
-        LRHD
+        LRHD  layer-settings (visible, transperency, lock, blendmode, etc)
+        LRSH  layer settings, layer has CTG
+        LRSR  no data, it is a ctg-layer
         ZCHK  zipped imagedata (DBOD or SRAW)
         DBOD  First imagedata, full image RLE-encoded
         SRAW  imagedata related to DBOD, pieces of RLE-encoded ata
