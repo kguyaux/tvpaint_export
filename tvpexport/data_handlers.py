@@ -268,8 +268,7 @@ class Layer(object):
             if image.type == "DBOD":
                 tile_data = tile.data
             else:  # SRAW
-                indent = 0
-                tile_data = self._resolve_tile_data(image, tile, indent)
+                tile_data = self._resolve_tile_data(image, tile)
 
             # # Debugging: print the index of the tile onto the tile.
             # tile_data[5:25, 1:50, :3] = (0,0,255)
@@ -280,17 +279,11 @@ class Layer(object):
 
             x = (tile.index * image.tile_size) % image.max_tilewidth
             y = (tile.index * image.tile_size) // image.max_tilewidth * image.tile_size
-            try:
-                image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
-            except:
-                print(tile.data)
-                print(tile.data.shape)
-                raise
-
-
+            image.result[y : y + tile_data.shape[0], x : x + tile_data.shape[1]] = tile_data
         return image.result
 
-    def _resolve_tile_data(self, image, tile, indent):
+
+    def _resolve_tile_data(self, image, tile):
         """Resolve tile-data
 
         Args:
@@ -304,7 +297,6 @@ class Layer(object):
         Returns:
             numpy.ndarray(): tile-(image)data
         """
-        pfx = indent * "----"
 
         tile.width = self.images[0].tiles[tile.index].width
         tile.height = self.images[0].tiles[tile.index].height
@@ -314,7 +306,6 @@ class Layer(object):
 
         elif tile.type == "RLE":
             tile_data = tile.data
-            # tile_data = decoders.decode_DBOD(tile.rle_data, tile.width, tile.height)
 
         elif tile.type == "CPY":
             if tile.ref_local_tile == True:
@@ -323,7 +314,7 @@ class Layer(object):
                 if ref_tile.type == "CPY":
                     # reference & resolve local tile
                     local_tile = image.tiles[tile.ref_local_tile_index]
-                    tile_data = self._resolve_tile_data(image, local_tile, indent)
+                    tile_data = self._resolve_tile_data(image, local_tile)
                 else:
                     # copy the image-data from local image
                     xpos = (tile.ref_local_tile_index * image.tile_size) % image.max_tilewidth
@@ -341,7 +332,6 @@ class Layer(object):
                 #     tile_data, str(tile.ref_local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
                 # )
             else:
-
                 if image.first_info == 6 or image.first_info == image.tile_size:
                     prev_image = self.images[image.index - 1]
                 elif image.first_info == 2:
@@ -350,15 +340,13 @@ class Layer(object):
                     raise RuntimeError(f"Unknown 'First info': {image.first_info}")
 
                 prev_tile = prev_image.tiles[tile.ref_local_tile_index]
-                tile_data = self._resolve_tile_data(prev_image, prev_tile, indent + 1)
+                tile_data = self._resolve_tile_data(prev_image, prev_tile)
 
         return tile_data
 
 
-
 class Image(object):
-    def __init__(self, image_type, index, width, height, tile_size=64, cache=None):
-        self.cache = None
+    def __init__(self, image_type, index, width, height, tile_size=64):
         self.type = image_type
         self.index = index
         self._raw_data = bytes()
