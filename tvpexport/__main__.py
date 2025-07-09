@@ -112,6 +112,11 @@ def main():
         action="store_true",
         help="Print info of everything (project, clip, scene, layer)"
     )
+    parser.add_argument('-t',
+        "--test",
+        action="store_true",
+        help="Test all processing, use this without the --show option for quicker testing."
+    )
 
     args = parser.parse_args()
     if args.debug:
@@ -138,15 +143,16 @@ def main():
         if args.print_info:
             pprint(layer.settings)
 
-        # for faster testing the imageprocessing, you can comment this out.
-        # if not args.output_dir and not args.show:
-        #     sys.exit(0)
+        if not args.test:
+            if not args.output_dir and not args.show:
+                sys.exit(0)
 
         if args.frame is not None:
             start_time = time.time()
             image = layer.frame(args.frame)
             logger.info(
-                f"Layer {layer.index} (\"{layer.name}\"), Frame {args.frame}, processing took: {time.time() - start_time:.6f} seconds"
+                f"Layer {layer.index} (\"{layer.name}\"), Frame {args.frame}, "
+                f"processing took: {time.time() - start_time:.6f} seconds"
             )
 
             if args.show:

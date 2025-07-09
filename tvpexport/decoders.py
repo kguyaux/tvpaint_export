@@ -209,9 +209,9 @@ def decode_LRHD(data: bytes):
         "start_frame": settings[3],
         "end_frame": settings[5],
         "transperency": settings[9],
-        "visible": bool(settings[15] & 0b0000000000000001),
-        "locked": bool(settings[15] & 0b0000000000010000),
-        'blend_mode': settings[30]
+        "invisible": bool(settings[15] & 0b00000001),
+        "locked": bool(settings[15] & 0b00010000),
+        'blend_mode': settings[31]
     }
 
 

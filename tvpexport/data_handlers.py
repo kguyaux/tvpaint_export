@@ -76,8 +76,14 @@ class Clip(object):
             scene_index=scene_index, clip_index=clip_index
         )
         self.metadata = self._read_clip_metadata(tvptree.file_path, clip_tree)
-        with open(self.tvptree.file_path, "rb") as file_obj:
-            self.read_clip_data(file_obj, clip_tree)
+        try:
+            with open(self.tvptree.file_path, "rb") as file_obj:
+                self.read_clip_data(file_obj, clip_tree)
+        except Exception as _exception_:
+            logger.exception(
+                f"This file might be corrupt! \n"
+                "Exception caught while reading clip data:"
+            )
 
     @property
     def dloc(self):
@@ -85,7 +91,7 @@ class Clip(object):
 
     @dloc.setter
     def dloc(self, values):
-        """ DLOC-data contains the dimesions of the clip.
+        """ DLOC-data contains the dimensions of the clip.
 
         Args:
             values (_type_): _description_
