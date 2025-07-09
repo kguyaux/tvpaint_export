@@ -1,9 +1,19 @@
-TVPAINT-EXPORT (v1.1.1)
+TVPAINT-EXPORT (v1.1.2)
 ==============
 
-Export images from a tvpaint-project(*.tvpp). Supported tvpaint-versions are 9,10, & 11. (12+ is untested)
+With this tool you can save(export) the images from a tvpaintfile(*.tvpp). With this it is easier to automate the
+export of layers&images for compositing. And probably other uses like dumping the salvageable contents of a
+corrupt tvpaint-file. There are some features I like to add, like the blending/compositing of
+layers. I also have plans to create a Blender-plugin, to directly load the layers into the compositor(without the need of intermediate exports)  
+
+This is a 'reverse-engineering'-project so a lot of tvpaint features, like sound, scribbles and other
+stuff are not resolved(yet). But feel free to fork/clone and figure them out yourself :-)
+Supported tvpaint-versions are 9,10, & 11. (12+ is untested)
 
 ### Changelog:
+- version 1.1.2  (9 july 2025)
+Cleanup, error-handling and a test-arg.
+
 - version 1.1.1  (6 july 2025)
 Some optimizations. faster RLE- & Unzip-decompression. Prevented unnecessary RLE-decompress
 
@@ -18,9 +28,13 @@ I revised the code to make it more usable. It still needs some refactoring and d
 I tested the code with some tvpaint-files, from tvpaint-versions 9, 10 & 11. There might be some specific cases of datastorage that need to be resolved.
 If you encounter errors, then let me know or file an issue.
 
+### Dependencies(python)
+- opencv-python
+- numpy
+
 ### TODO:
-- compositing; being able to merge layers.
-- Make use of (tile)caching to make it faster.
+- To be able to process layer- and image-arguments as a list.
+- compositing; being able to merge(blend) layers.
 - handle multiple clips and scenes. I don't have example-tvp-projects that contain multiple scenes/clips. Expect errors when your project has those. I need an example to fix the code for this, so If someone has an example-tvpp with multiple clips/scenes and can send it to me then that would be nice :-)
 
 ### Usage:
@@ -28,7 +42,7 @@ If you encounter errors, then let me know or file an issue.
 $ pip install opencv-python numpy
 $ python -m tvpexport -h
 
-usage: __main__.py [-h] [-d] [-a] [-l LAYER] [-f FRAME] [-s] [-i] [-o OUTPUT_DIR] [-p] tvpaint-file(*.tvpp)
+usage: __main__.py [-h] [-d] [-a] [-l LAYER] [-f FRAME] [-s] [-i] [-o OUTPUT_DIR] [-p] tvpaint-file()
 
 Export images from a tvpaint-project.
 
@@ -48,6 +62,7 @@ options:
   -o OUTPUT_DIR, --output_dir OUTPUT_DIR
                         Output-dir of where to save images(overwrites!).
   -p, --print_info      Print info of everything (project, clip, scene, layer)
+  -t, --test            Test all processing, use this without the --show option for quicker testing.
 
 
 # EXAMPLE1: will show debugmessages while auto-showing all images of layer 0 (index = top to bottom), and save the images as png to directory 'output_dir'

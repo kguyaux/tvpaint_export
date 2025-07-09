@@ -8,9 +8,7 @@ import struct
 import numpy as np
 # import cv2
 from . import decoders
-from circular_dict import CircularDict
 import logging
-from collections import deque
 
 # setup logger
 logger = logging.getLogger(__name__)
@@ -280,7 +278,8 @@ class Layer(object):
             # tile_data[5:25, 1:50, :3] = (0,0,255)
             # tile_data[5:25, 1:50, 3] = 150
             # cv2.putText(
-            #     tile_data, str(tile.index), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1, cv2.LINE_AA
+            #     tile_data, str(tile.index), (1,20), cv2.FONT_HERSHEY_SIMPLEX,
+            #     0.5, (0,0,0), 1, cv2.LINE_AA
             # )
 
             x = (tile.index * image.tile_size) % image.max_tilewidth
@@ -293,12 +292,8 @@ class Layer(object):
         """Resolve tile-data
 
         Args:
-            image (Image()): Image()-object
-            tile (ImageTile()): Tile()-object
-
-        Raises:
-            RuntimeError: 'Crash' when unknown image-header-data is discovered.
-            So we can implement it, afterwards.
+            image (Image()): image-object, for referencing imagedata
+            tile (ImageTile()): tile-object
 
         Returns:
             numpy.ndarray(): tile-(image)data
@@ -335,7 +330,8 @@ class Layer(object):
                 # tile_data[20:50, 1:50, :3] = (0, 255, 0)
                 # tile_data[20:50, 1:50, 3] = 200
                 # cv2.putText(
-                #     tile_data, str(tile.ref_local_tile_index), (1,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
+                #     tile_data, str(tile.ref_local_tile_index), (1,45),
+                #     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA
                 # )
             else:
                 if image.first_info == 6 or image.first_info == image.tile_size:
@@ -400,6 +396,8 @@ class Image(object):
 
     @property
     def first_info(self):
+        # First info tells us if this image repeats last image or a specific one.
+        #
         if not self._first_info:
             self._first_info = struct.unpack_from(">I", self.raw_data, 0)[0]
         return self._first_info
